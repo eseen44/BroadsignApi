@@ -30,16 +30,16 @@ def get_fill_rate_breakdown(session, screen_ids, start_date=None, end_date=None,
 def get_all_fill_rate(session, screen_ids, start_date=None, end_date=None):
     first = get_fill_rate_breakdown(session, screen_ids, start_date, end_date,
                                     skip=0, top=PAGE_SIZE)
-    total = first.get("total", first.get("total_rows", len(first.get("data", []))))
-    results = first.get("data", [])
+    total = first["total"]
+    results = first["data"]["proposal_items"]
 
-    print(f"Fill rate: {total} rekordów. Pobieranie...", flush=True)
+    print(f"Fill rate: {total} rekordow. Pobieranie...", flush=True)
 
     skip = PAGE_SIZE
     while skip < total:
         page = get_fill_rate_breakdown(session, screen_ids, start_date, end_date,
                                        skip=skip, top=PAGE_SIZE)
-        results.extend(page.get("data", []))
+        results.extend(page["data"]["proposal_items"])
         print(f"  {min(skip + PAGE_SIZE, total)}/{total}", flush=True)
         skip += PAGE_SIZE
 
