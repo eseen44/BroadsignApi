@@ -39,8 +39,10 @@ def get_session() -> requests.Session:
 
 def _list_files(session: requests.Session, prefix: str) -> list[str]:
     """
-    Zwraca posortowana liste plikow o danym prefixie (playlog / resources).
-    Obsluguje zarowno .txt jak i .txt.gz.
+    Zwraca posortowana liste plikow .txt o danym prefixie (playlog / resources).
+    Ignoruje .txt.gz — serwer kompresuje starsze pliki, ale nasze dane
+    przyrastaja codziennie przez pobranie biezacego .txt.
+    Obsluga .gz jest zachowana w _fetch_text() jako safety net.
     """
     r = session.get(URL_BASE, timeout=15)
     r.raise_for_status()
@@ -49,18 +51,19 @@ def _list_files(session: requests.Session, prefix: str) -> list[str]:
     for a in soup.find_all("a"):
         href = a.get("href", "")
         low = href.lower()
-        if prefix in low and (low.endswith(".txt") or low.endswith(".txt.gz")):
+        # tylko .txt, nie .txt.gz
+        if prefix in low and low.endswith(".txt") and not low.endswith(".txt.gz"):
             files.append(href)
     return sorted(files)
 
 
 def list_playlog_files(session: requests.Session) -> list[str]:
-    """Zwraca posortowana liste plikow playlog (np. 'playlog-2026-05-26.txt')."""
+    """Zwraca posortowana liste biezacych plikow playlog (.txt)."""
     return _list_files(session, "playlog")
 
 
 def list_resource_files(session: requests.Session) -> list[str]:
-    """Zwraca posortowana liste plikow resources."""
+    """Zwraca posortowana liste biezacych plikow resources (.txt)."""
     return _list_files(session, "resources")
 
 
