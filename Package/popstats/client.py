@@ -1,25 +1,27 @@
 """
 Broadsign popstats client.
-Źródło: https://popstats.broadsign.com/stroer_polska/
-Format: pliki .txt (tab-separated), jeden dzień = jeden plik.
-Dane: surowe logi emisji (każde odtworzenie = jeden wiersz).
+Zrodlo: https://popstats.broadsign.com/stroer_polska/
+Format: pliki .txt lub .txt.gz (tab-separated), jeden dzien = jeden plik.
+Dwa typy plikow:
+  playlog-YYYY-MM-DD.txt[.gz]   — surowe logi emisji
+  resources-YYYY-MM-DD.txt[.gz] — slownik ID->Nazwa dla wszystkich obiektow
 """
 import io
+import gzip
 import requests
 from bs4 import BeautifulSoup
-from datetime import date
 
 URL_BASE = "https://popstats.broadsign.com/stroer_polska/"
 USERNAME  = "stroer_polska"
 PASSWORD  = "***REMOVED***"
 
-# Mapowanie kolumn surowego pliku .txt
+# Mapowanie kolumn surowego pliku playlog .txt
 RAW_COLS = {
     0:  "PlayerID",
     1:  "DateEndTime",
     2:  "Duration",
     3:  "AdCopyId",
-    # 4: pomijamy (zawsze 2 — wewnętrzny kod Broadsign)
+    # 4: pomijamy (zawsze 2 — wewnetrzny kod Broadsign)
     5:  "CampID",
     6:  "FrameID",
     7:  "DisplayUnitID",
@@ -35,37 +37,65 @@ def get_session() -> requests.Session:
     return session
 
 
-def list_playlog_files(session: requests.Session) -> list[str]:
-    """Zwraca posortowaną listę dostępnych plików playlog (np. ['playlog-2026-05-26.txt'])."""
+def _list_files(session: requests.Session, prefix: str) -> list[str]:
+    """
+    Zwraca posortowana liste plikow o danym prefixie (playlog / resources).
+    Obsluguje zarowno .txt jak i .txt.gz.
+    """
     r = session.get(URL_BASE, timeout=15)
     r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
-    files = [
-        a.get("href") for a in soup.find_all("a")
-        if a.get("href", "").lower().endswith(".txt")
-        and "playlog" in a.get("href", "").lower()
-    ]
+    files = []
+    for a in soup.find_all("a"):
+        href = a.get("href", "")
+        low = href.lower()
+        if prefix in low and (low.endswith(".txt") or low.endswith(".txt.gz")):
+            files.append(href)
     return sorted(files)
 
 
+def list_playlog_files(session: requests.Session) -> list[str]:
+    """Zwraca posortowana liste plikow playlog (np. 'playlog-2026-05-26.txt')."""
+    return _list_files(session, "playlog")
+
+
+def list_resource_files(session: requests.Session) -> list[str]:
+    """Zwraca posortowana liste plikow resources."""
+    return _list_files(session, "resources")
+
+
+def _fetch_text(session: requests.Session, filename: str) -> str:
+    """Pobiera zawartosc pliku — automatycznie dekompresuje .gz."""
+    r = session.get(URL_BASE + filename, timeout=120)
+    r.raise_for_status()
+    if filename.lower().endswith(".gz"):
+        return gzip.decompress(r.content).decode("utf-8")
+    return r.text
+
+
 def filename_to_date(filename: str) -> str:
-    """'playlog-2026-05-26.txt' → '2026-05-26'"""
-    stem = filename.replace("playlog-", "").replace(".txt", "")
+    """
+    'playlog-2026-05-26.txt'    -> '2026-05-26'
+    'playlog-2026-05-22.txt.gz' -> '2026-05-22'
+    """
+    stem = filename
+    for suffix in (".txt.gz", ".txt"):
+        stem = stem.replace(suffix, "")
+    stem = stem.replace("playlog-", "").replace("resources-", "")
     return stem
 
 
 def fetch_and_parse(session: requests.Session, filename: str) -> "pd.DataFrame":
     """
-    Pobiera jeden plik playlog i zwraca zagregowany DataFrame
-    (grupowanie identyczne jak w oryginalnym Script.py, + contract_id).
+    Pobiera jeden plik playlog (.txt lub .txt.gz) i zwraca zagregowany DataFrame.
+    Grupowanie identyczne jak w oryginalnym ScriptLinux2.py + contract_id.
     """
     import pandas as pd
 
-    r = session.get(URL_BASE + filename, timeout=120)
-    r.raise_for_status()
+    text = _fetch_text(session, filename)
 
     df = pd.read_csv(
-        io.StringIO(r.text),
+        io.StringIO(text),
         sep="\t",
         header=None,
         names=range(13),
@@ -115,3 +145,49 @@ def fetch_and_parse(session: requests.Session, filename: str) -> "pd.DataFrame":
     )
 
     return agg
+
+
+def fetch_resources_latest(session: requests.Session) -> "pd.DataFrame":
+    """
+    Pobiera najnowszy plik resources i zwraca DataFrame z kolumnami:
+      id   (str) — ID zasobu (display_unit, reservation, content, host, skin)
+      name (str) — nazwa
+      type (str) — typ: display_unit | reservation | content | host | skin
+
+    Typy mapuja sie na kolumny play_logs:
+      host         -> PlayerID        (ctrl_players.claimed_resource_id)
+      display_unit -> DisplayUnitID   (ctrl_display_units.id)
+      reservation  -> CampID          (ctrl_reservations.id)
+      content      -> AdCopyId        (ctrl_content.id)
+    """
+    import pandas as pd
+
+    files = list_resource_files(session)
+    if not files:
+        raise RuntimeError("Brak plikow resources na serwerze popstats")
+
+    latest = files[-1]  # posortowane — ostatni = najnowszy
+    print(f"  Pobieranie resources: {latest}")
+    text = _fetch_text(session, latest)
+
+    rows = []
+    for line in text.splitlines():
+        line = line.rstrip("\r\n")
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) < 4:
+            continue  # niepelny wiersz — pomijamy
+        rows.append(parts[:4])
+
+    df = pd.DataFrame(rows, columns=["id", "name", "unused", "type"])
+    df = df.drop(columns=["unused"])
+    df["id"]   = df["id"].astype(str).str.strip()
+    df["name"] = df["name"].astype(str).str.strip()
+    df["type"] = df["type"].astype(str).str.strip()
+    # Zostaw tylko znane typy
+    known_types = {"display_unit", "reservation", "content", "host", "skin"}
+    df = df[df["type"].isin(known_types)].copy()
+    df["source_file"] = latest
+
+    return df

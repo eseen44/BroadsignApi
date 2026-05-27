@@ -16,8 +16,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
 
-from Package.popstats.client import get_session, list_playlog_files, fetch_and_parse, filename_to_date
-from Pipeline.bronze.utils import append_parquet, load_cursors, save_cursor
+from Package.popstats.client import (
+    get_session, list_playlog_files, list_resource_files,
+    fetch_and_parse, fetch_resources_latest, filename_to_date,
+)
+from Pipeline.bronze.utils import append_parquet, load_cursors, save_cursor, save_parquet
 
 HISTORICAL_CSV = (
     Path.home()
@@ -81,37 +84,91 @@ def import_historical(csv_path: Path = HISTORICAL_CSV) -> bool:
 def fetch_incremental(session=None) -> dict:
     """
     Pobiera z popstats tylko te pliki których jeszcze nie mamy.
-    Śledzi pobrane pliki w _cursors.json.
+    Sledzi pobrane pliki w _cursors.json.
+
+    Strategia:
+    - Jesli data pliku jest juz w play_logs.parquet -> oznacz jako pobrane bez downloadowania
+      (pokrywa pliki historyczne obecne w CSV, ktre teraz pojawiaja sie jako .gz na serwerze)
+    - Jesli data nowa -> pobierz, sparsuj, dodaj do parqueta
     """
+    from Pipeline.bronze.utils import BRONZE_DIR
+    import pandas as pd
+
     if session is None:
         session = get_session()
 
-    cursors      = load_cursors()
+    cursors       = load_cursors()
     fetched_files = set(cursors.get(CURSORS_KEY, []))
 
     available = list_playlog_files(session)
     new_files  = [f for f in available if f not in fetched_files]
 
     if not new_files:
-        print(f"  [popstats] Brak nowych plików (dostępne: {len(available)}, pobrane: {len(fetched_files)}).")
+        print(f"  [popstats] Brak nowych plikow (dostepne: {len(available)}, pobrane: {len(fetched_files)}).")
         return {"new_files": 0, "new_rows": 0}
 
-    print(f"  [popstats] Nowe pliki do pobrania: {new_files}")
+    # Wczytaj juz istniejace daty z parqueta (jesli istnieje)
+    parquet_path = BRONZE_DIR / "play_logs.parquet"
+    existing_dates: set = set()
+    if parquet_path.exists():
+        existing_dates = set(
+            pd.read_parquet(parquet_path, columns=["DateEnd"])["DateEnd"]
+            .astype(str).unique()
+        ) - {"NaT", "nan", "None"}
+
     total_rows = 0
+    skipped = 0
+    downloaded = 0
 
     for filename in new_files:
         day = filename_to_date(filename)
-        print(f"    Pobieranie {filename} (dzień: {day})...")
+
+        if day in existing_dates:
+            # Data juz w parquecie (np. z historycznego CSV) — nie pobieraj
+            print(f"    Pomijam {filename} — dzien {day} juz w parquecie")
+            fetched_files.add(filename)
+            skipped += 1
+            save_cursor(CURSORS_KEY, sorted(fetched_files))
+            continue
+
+        print(f"    Pobieranie {filename} (dzien: {day})...")
         try:
             df = fetch_and_parse(session, filename)
             _, added = append_parquet(df, "play_logs", date_col="DateEnd")
             total_rows += added
             fetched_files.add(filename)
+            downloaded += 1
             save_cursor(CURSORS_KEY, sorted(fetched_files))
         except Exception as e:
-            print(f"    BŁĄD przy {filename}: {e}")
+            print(f"    BLAD przy {filename}: {e}")
 
-    return {"new_files": len(new_files), "new_rows": total_rows}
+    print(f"  [popstats] Pobrane: {downloaded}, pominiete (juz w parquecie): {skipped}")
+    return {"new_files": downloaded, "new_rows": total_rows}
+
+
+# ---------------------------------------------------------------------------
+# 3. Resources — slownik ID->Nazwa z popstats
+# ---------------------------------------------------------------------------
+
+def fetch_resources(session=None) -> int:
+    """
+    Pobiera najnowszy plik resources z popstats i zapisuje jako bronze.
+    Zwraca liczbe rekordow.
+
+    Plik resources zawiera slownik ID->Nazwa dla wszystkich obiektow uzywanych
+    w play_logs:
+      host         -> PlayerID       (= ctrl_players.claimed_resource_id)
+      display_unit -> DisplayUnitID  (= ctrl_display_units.id)
+      reservation  -> CampID         (= ctrl_reservations.id)
+      content      -> AdCopyId       (= ctrl_content.id)
+      skin         -> rendering template (zwykle ignorowany)
+    """
+    if session is None:
+        session = get_session()
+
+    df = fetch_resources_latest(session)
+    save_parquet(df, "resources_latest")
+    return len(df)
 
 
 # ---------------------------------------------------------------------------
@@ -121,13 +178,18 @@ def fetch_incremental(session=None) -> dict:
 if __name__ == "__main__":
     print("=== Play logs bronze ===")
 
-    # 1. Import historyczny (pomijany jeśli parquet już istnieje)
-    print("\n[1/2] Import historyczny...")
+    # 1. Import historyczny (pomijany jesli parquet juz istnieje)
+    print("\n[1/3] Import historyczny...")
     import_historical()
 
-    # 2. Dociągnij nowe pliki z popstats
-    print("\n[2/2] Incremental fetch z popstats...")
     session = get_session()
-    result  = fetch_incremental(session)
 
-    print(f"\nGotowe: {result['new_files']} nowych plików, {result['new_rows']} nowych wierszy.")
+    # 2. Dociagnij nowe pliki z popstats
+    print("\n[2/3] Incremental fetch z popstats...")
+    result = fetch_incremental(session)
+    print(f"  Nowe pliki: {result['new_files']}, nowe wiersze: {result['new_rows']}")
+
+    # 3. Resources
+    print("\n[3/3] Resources (ID->Nazwa)...")
+    n = fetch_resources(session)
+    print(f"  Pobrano {n} zasobow.")

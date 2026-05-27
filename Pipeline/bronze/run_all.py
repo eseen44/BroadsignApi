@@ -30,7 +30,7 @@ from Pipeline.bronze.fetch_direct import (
     fetch_users,
 )
 from Pipeline.bronze.fetch_control import fetch_all_control
-from Pipeline.bronze.fetch_play_logs import import_historical, fetch_incremental
+from Pipeline.bronze.fetch_play_logs import import_historical, fetch_incremental, fetch_resources
 
 
 def run():
@@ -100,14 +100,23 @@ def run():
         print(f"  BŁĄD: {e}")
         results["play_logs_historical"] = f"FAIL: {e}"
 
+    popstats = get_popstats_session()
+
     print("\n[play_logs / incremental popstats]")
     try:
-        popstats = get_popstats_session()
         pr = fetch_incremental(popstats)
         results["play_logs_incremental"] = f"OK (+{pr['new_files']} pliki, +{pr['new_rows']} wierszy)"
     except Exception as e:
-        print(f"  BŁĄD: {e}")
+        print(f"  BLAD: {e}")
         results["play_logs_incremental"] = f"FAIL: {e}"
+
+    print("\n[resources_latest]")
+    try:
+        n = fetch_resources(popstats)
+        results["resources_latest"] = f"OK ({n} zasobow)"
+    except Exception as e:
+        print(f"  BLAD: {e}")
+        results["resources_latest"] = f"FAIL: {e}"
 
     # ------------------------------------------------------------------
     # Podsumowanie
