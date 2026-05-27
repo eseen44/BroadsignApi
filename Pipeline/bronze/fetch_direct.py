@@ -17,10 +17,10 @@ import pandas as pd
 from datetime import date, timedelta
 
 from Package.auth import get_session
-from Package.proposals import get_all_proposals
-from Package.proposal_items import get_all_proposal_items
-from Package.inventory import get_all_screens, get_screens_frames_mapping
-from Package.reporting import get_all_fill_rate
+from Package.direct.proposals import get_all_proposals
+from Package.direct.proposal_items import get_all_proposal_items
+from Package.direct.inventory import get_all_screens, get_screens_frames_mapping
+from Package.direct.reporting import get_all_fill_rate
 from Pipeline.bronze.utils import save_parquet
 
 FILL_RATE_DAYS = 28  # ile dni wstecz dla fill_rate — API max: 1 miesiąc
