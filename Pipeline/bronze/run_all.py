@@ -47,22 +47,37 @@ def run():
     print("--- Direct API (overwrite) ---")
     direct = get_direct_session()
 
-    direct_steps = [
+    simple_steps = [
         ("proposals",              fetch_proposals),
         ("proposal_items",         fetch_proposal_items),
         ("screens",                fetch_screens),
         ("screens_frames_mapping", fetch_screens_frames_mapping),
-        ("fill_rate",              fetch_fill_rate),
         ("users",                  fetch_users),
     ]
-    for label, fn in direct_steps:
+    for label, fn in simple_steps:
         print(f"\n[{label}]")
         try:
             fn(direct)
             results[label] = "OK"
         except Exception as e:
-            print(f"  BŁĄD: {e}")
+            print(f"  BLAD: {e}")
             results[label] = f"FAIL: {e}"
+
+    # fill_rate — screen_ids bierzemy z bronze zamiast wołać API drugi raz
+    print("\n[fill_rate]")
+    try:
+        import pandas as pd
+        from Pipeline.bronze.utils import BRONZE_DIR
+        screens_parquet = BRONZE_DIR / "screens.parquet"
+        if screens_parquet.exists():
+            screen_ids = pd.read_parquet(screens_parquet)["id"].tolist()
+        else:
+            screen_ids = None  # fallback: fetch_fill_rate pobierze sam
+        fetch_fill_rate(direct, screen_ids=screen_ids)
+        results["fill_rate"] = "OK"
+    except Exception as e:
+        print(f"  BLAD: {e}")
+        results["fill_rate"] = f"FAIL: {e}"
 
     # ------------------------------------------------------------------
     # 2. Control API — overwrite / incremental upsert

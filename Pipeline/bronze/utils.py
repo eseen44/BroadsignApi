@@ -96,7 +96,13 @@ def upsert_parquet(df: pd.DataFrame, name: str, key_col: str = "id") -> Path:
     df["_fetched_at"] = _now()
     df = stringify_nested(df)
 
-    if path.exists() and len(df) > 0:
+    if len(df) == 0:
+        # Nic do upsertowania — nie dotykaj istniejącego pliku
+        existing_count = len(pd.read_parquet(path)) if path.exists() else 0
+        print(f"  -> [upsert] brak nowych rekordow -> {path.name} bez zmian ({existing_count} wierszy)")
+        return path
+
+    if path.exists():
         existing = pd.read_parquet(path)
         # Usuń stare wersje rekordów które teraz aktualizujemy
         keep = existing[~existing[key_col].isin(df[key_col])]

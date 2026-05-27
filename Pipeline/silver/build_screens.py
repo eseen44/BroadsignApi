@@ -2,9 +2,18 @@
 Silver: screens_full = screens × screens_frames_mapping
 
 Jeden wiersz = jeden frame (każdy screen może mieć wiele frame'ów).
-Klucz joinu: screens_frames_mapping.screen_id → screens.id
+Klucz joinu: SFM.group_id → screens.id  (NIE SFM.screen_id!)
 
-Użycie: join z play_logs przez FrameID = frame_id
+Uwagi o schemacie SFM:
+  frame_id   = ID slotu emisji = play_logs.FrameID
+  screen_id  = ID panelu fizycznego (sub-wyswietlacz w stacji) - przemianowany na panel_id
+  group_id   = ID stacji = screens.id w Direct API  <- właściwy klucz joinu
+  group_uuid = UUID stacji = screens.uuid
+
+Ekrany bez screen_name (~79 frame'ow):
+  Stacje B9D/B18D (billboardy), StroerTV, BIURO — sa w ctrl_display_units (Control API)
+  ale NIE sa w Direct API digital inventory (tam sa tylko 93 ekrany TP).
+  Mozna je identyfikowac przez screen_bridge.display_unit_name.
 """
 import sys
 from pathlib import Path
@@ -46,6 +55,12 @@ def build_screens() -> pd.DataFrame:
     # Ujednolicenie typów przed joiniem
     mapping_slim["screen_id"] = pd.to_numeric(mapping_slim["screen_id"], errors="coerce").astype("Int64")
     screens_slim["screen_id"] = pd.to_numeric(screens_slim["screen_id"], errors="coerce").astype("Int64")
+
+    # Dedup — API zwraca czasem identyczne wiersze; jeden frame = jeden wiersz
+    before = len(mapping_slim)
+    mapping_slim = mapping_slim.drop_duplicates(subset=["frame_id"])
+    if len(mapping_slim) < before:
+        print(f"  Usunieto {before - len(mapping_slim)} zduplikowanych frame_id z SFM")
 
     # JOIN: mapping → screens (przez group_id=screen_id)
     df = mapping_slim.merge(screens_slim, on="screen_id", how="left")

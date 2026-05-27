@@ -51,17 +51,27 @@ def fetch_screens_frames_mapping(session):
     print("Screens-frames mapping...")
     records = get_screens_frames_mapping(session)
     df = pd.DataFrame(records)
+    before = len(df)
+    # API czasem zwraca identyczne duplikaty — usuwamy
+    df = df.drop_duplicates(subset=["frame_id"])
+    if len(df) < before:
+        print(f"  Usunieto {before - len(df)} zduplikowanych wierszy (frame_id)")
     return save_parquet(df, "screens_frames_mapping")
 
 
-def fetch_fill_rate(session, days_back=FILL_RATE_DAYS):
+def fetch_fill_rate(session, screen_ids=None, days_back=FILL_RATE_DAYS):
+    """
+    screen_ids: lista ID ekranów (opcjonalnie — jeśli None, pobieramy ze screens bronze).
+    Przekazanie screen_ids z wcześniej pobranego fetch_screens() oszczędza jedno API call.
+    """
     print(f"Fill rate (ostatnie {days_back} dni)...")
     end_date = date.today() - timedelta(days=1)
     start_date = end_date - timedelta(days=days_back - 1)
     print(f"  Zakres: {start_date} -> {end_date}")
 
-    screens = get_all_screens(session, inventory_type="digital")
-    screen_ids = [s["id"] for s in screens]
+    if screen_ids is None:
+        screens = get_all_screens(session, inventory_type="digital")
+        screen_ids = [s["id"] for s in screens]
 
     records = get_all_fill_rate(session, screen_ids, start_date, end_date)
     if not records:
