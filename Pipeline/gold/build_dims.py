@@ -225,8 +225,13 @@ def build_dim_player():
 
     # Flaga nośników testowych / biurowych (łatwe filtrowanie w PBI)
     _test_pat = _re.compile(r'biuro|test', _re.IGNORECASE)
-    df["is_test"] = df["display_unit_name"].apply(
-        lambda v: bool(_test_pat.search(v)) if isinstance(v, str) else False
+    df["is_test"] = df.apply(
+        lambda row: any(
+            bool(_test_pat.search(v))
+            for v in [row.get("player_name"), row.get("display_unit_name")]
+            if isinstance(v, str)
+        ),
+        axis=1,
     )
     print(f"  Nosniki testowe (is_test=True): {df['is_test'].sum()}")
 
