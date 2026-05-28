@@ -27,14 +27,14 @@ def build_fact_play_logs():
 
     # Slim — tylko klucze i miary
     keep = [
-        "DateEnd",        # → dim_date
-        "PlayerID",       # → dim_player
-        "FrameID",        # → dim_screen
-        "DisplayUnitID",  # dodatkowy klucz (nie zawsze frame jest dostępny)
-        "CampID",         # → reservation (→ dim_campaign przez reservation)
-        "AdCopyId",       # → dim_content
-        "timeslot",       # godzina (0-23) — degenerate dim
-        "contract_id",    # opcjonalny bridge → dim_campaign bezpośrednio
+        "DateEnd",        # → date_key
+        "PlayerID",       # → play_log_player_id
+        "FrameID",        # → frame_id
+        "DisplayUnitID",  # → display_unit_id
+        "CampID",         # → reservation_id
+        "AdCopyId",       # → content_id
+        "timeslot",
+        "contract_id",
         # miary
         "emisje",
         "Impresje",
@@ -48,6 +48,16 @@ def build_fact_play_logs():
             df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
 
     df["timeslot"] = pd.to_numeric(df["timeslot"], errors="coerce").astype("Int64")
+
+    # Spójne nazwy kluczy (matching z dim tables)
+    df = df.rename(columns={
+        "DateEnd":       "date_key",
+        "PlayerID":      "play_log_player_id",
+        "FrameID":       "frame_id",
+        "DisplayUnitID": "display_unit_id",
+        "CampID":        "reservation_id",
+        "AdCopyId":      "content_id",
+    })
 
     save_gold(df, "fact_play_logs")
 

@@ -141,12 +141,19 @@ def build_fact_budget():
 
     fact["daily_cost_line"] = fact["daily_cost_line"].astype("float64")
 
-    total = len(fact)
+    # Statystyki przed rename
+    total       = len(fact)
     with_player = fact["player_id"].notna().sum()
     adj_rows    = fact["is_adjustment"].sum()
     print(f"  Wierszy łącznie:             {total:,}")
-    print(f"    z player_id:               {with_player:,} ({with_player/total:.1%})")
+    print(f"    z play_log_player_id:      {with_player:,} ({with_player/total:.1%})")
     print(f"    wiersze korygujące:        {adj_rows:,}")
+
+    # Spójne nazwy kluczy (matching z dim tables)
+    fact = fact.rename(columns={
+        "player_id": "play_log_player_id",
+        "date":      "date_key",
+    })
 
     save_gold(fact, "fact_campaign_budget")
 
