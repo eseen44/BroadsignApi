@@ -21,7 +21,7 @@ from Pipeline.gold.utils import read_bronze, read_silver, save_gold
 
 import re as _re
 
-# Kody techniczne: A01, C11, TP, TP05, DMB, DMB03, CD, B9D itp.
+# Kody techniczne: A01, C11, TP, TP05, DMB, DMB03, CD itp.
 # UWAGA: czyste akronimy bez cyfr (ONZ, PKP) NIE są kodami — są częścią nazwy stacji
 _CODE_PATTERN = _re.compile(r'^(TP\d*|DMB\d*|CD|CA|[A-Z]{1,2}\d+[A-Z]?)$')
 # Słowa kończące wyciąganie nazwy stacji (kierunki + "cała stacja")
@@ -30,29 +30,52 @@ _STOP_WORDS   = {'północ', 'południe', 'wschód', 'zachód', 'polnoc', 'polud
                  'pónoc',  # literówka w źródle
                  'cała', 'stacja'}
 
+# Wzorce priorytetowe — sprawdzane w kolejności PRZED logiką stacji metra.
+# Jeśli nazwa zawiera dany regexp, zwracamy etykietę bezpośrednio.
+_PRIORITY_PATTERNS = [
+    ("Wrocław",   _re.compile(r'Wrocław',   _re.IGNORECASE)),
+    ("Kraków",    _re.compile(r'Kraków',    _re.IGNORECASE)),
+    ("Katowice",  _re.compile(r'Katowice',  _re.IGNORECASE)),
+    ("Lotnisko",  _re.compile(r'Lotnisko',  _re.IGNORECASE)),
+    ("B9D",       _re.compile(r'B9D')),
+    ("B18D",      _re.compile(r'B18D')),
+    ("B36D",      _re.compile(r'B36D')),
+]
+
 
 def _lokalizacja(series: pd.Series) -> pd.Series:
     """
-    Wyciąga nazwę stacji metro ze środka nazwy display_unit.
+    Wyciąga lokalizację z nazwy display_unit / screen.
 
-    Formaty:
-      A01_Kabaty_TP05_południe        → "Kabaty"
-      A01_TP_Kabaty_północ            → "Kabaty"
-      A10_TP_Pole_Mokotowskie_północ  → "Pole Mokotowskie"
-      C11_Świętokrzyska_DMB02         → "Świętokrzyska"
+    Kolejność sprawdzania:
+      1. Wzorce priorytetowe (miasta, formaty billboardów) — zwracają etykietę wprost
+      2. Pipe-format: "B18D | Ulica/Adres | ID"  → część środkowa
+      3. Underscore-format stacji metra: A01_Kabaty_TP05_południe → "Kabaty"
+      4. Fallback: drugi wyraz (spacja)
+
+    Przykłady:
+      "...Wrocław..."                           → "Wrocław"
+      "B18D | Plac Konstytucji | 123"           → "B18D"
+      "B9D | Centrum | 456"                     → "B9D"
+      A01_Kabaty_TP05_południe                  → "Kabaty"
+      A10_TP_Pole_Mokotowskie_północ            → "Pole Mokotowskie"
       C13_DMB_Centrum_Nauk_Kopernik_cała_stacja → "Centrum Nauk Kopernik"
-      B9D | Plac Konstytucji | id     → "Plac Konstytucji"  (pipe-format)
-      "Subway Entrance"               → "Entrance"          (spacja-fallback)
     """
     def _extract(val):
         if not isinstance(val, str):
             return None
 
-        # Pipe-format: billboardy "B18D | Ulica/Adres | ID"
+        # 1. Wzorce priorytetowe
+        for label, pattern in _PRIORITY_PATTERNS:
+            if pattern.search(val):
+                return label
+
+        # 2. Pipe-format: billboardy "KOD | Ulica/Adres | ID"
         if " | " in val:
             parts = val.split(" | ")
             return parts[1].strip() if len(parts) >= 2 else None
 
+        # 3. Underscore-format: stacje metra
         if "_" in val:
             parts = val.split("_")
             station_parts = []
@@ -69,7 +92,7 @@ def _lokalizacja(series: pd.Series) -> pd.Series:
                 station_parts.append(part)
             return " ".join(station_parts) if station_parts else None
 
-        # Fallback: spacja
+        # 4. Fallback: spacja
         parts = val.split(" ")
         return parts[1] if len(parts) >= 2 else None
 
