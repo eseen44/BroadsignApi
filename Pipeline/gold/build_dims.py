@@ -241,10 +241,10 @@ def build_dim_content():
 # ---------------------------------------------------------------------------
 
 def build_all_dims():
-    print("[dim_date]");   build_dim_date()
-    print("[dim_screen]"); build_dim_screen()
-    print("[dim_player]"); build_dim_player()
-    print("[dim_content]");build_dim_content()
+    print("[dim_date]");    build_dim_date()
+    print("[dim_screen]");  build_dim_screen()
+    print("[dim_player]");  build_dim_player()
+    print("[dim_content]"); build_dim_content()
 
 
 if __name__ == "__main__":
