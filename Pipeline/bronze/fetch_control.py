@@ -33,6 +33,54 @@ ENDPOINTS = {
 INCREMENTAL = {"reservations", "content", "bundles", "bundle_content", "schedules"}
 
 
+def fetch_reservations_v22(session) -> dict:
+    """
+    Pobiera pełne dane rezervacji z v22 (po ID) — zawiera proposal_line_item_id
+    którego brakuje w standardowym incremental fetchu.
+    Zapisuje jako ctrl_reservations_v22.parquet (overwrite przy każdym runie).
+    """
+    from Pipeline.bronze.utils import BRONZE_DIR
+
+    # Pobierz ID z istniejącego ctrl_reservations
+    res_path = BRONZE_DIR / "ctrl_reservations.parquet"
+    if not res_path.exists():
+        print("  ctrl_reservations.parquet nie istnieje — pomiń v22 fetch")
+        return {"rows": 0, "ok": True}
+
+    ids = pd.read_parquet(res_path, columns=["id"])["id"].tolist()
+    if not ids:
+        return {"rows": 0, "ok": True}
+
+    BATCH = 100
+    records = []
+    for i in range(0, len(ids), BATCH):
+        batch = ids[i:i+BATCH]
+        id_str = ",".join(str(x) for x in batch)
+        r = session.get(
+            f"https://api.broadsign.com:10889/rest/reservation/v22/many?ids={id_str}",
+            timeout=60,
+        )
+        r.raise_for_status()
+        records.extend(r.json().get("reservation", []))
+        print(f"  v22: {min(i+BATCH, len(ids))}/{len(ids)}", end="\r", flush=True)
+
+    print()
+    df = pd.DataFrame(records)
+    # Zostaw tylko kluczowe kolumny (resztę mamy w ctrl_reservations)
+    keep = ["id", "proposal_id", "proposal_line_item_id", "contract_id",
+            "container_id", "booking_state", "has_goal", "goal_unit", "goal_amount"]
+    df = df[[c for c in keep if c in df.columns]]
+    # Zamień puste stringi na None
+    for col in ["proposal_id", "proposal_line_item_id", "contract_id"]:
+        if col in df.columns:
+            df[col] = df[col].replace("", None)
+
+    save_parquet(df, "ctrl_reservations_v22")
+    print(f"  ctrl_reservations_v22: {len(df)} wierszy, "
+          f"z proposal_line_item_id: {df['proposal_line_item_id'].notna().sum()}")
+    return {"rows": len(df), "ok": True}
+
+
 def fetch_all_control(session) -> dict:
     results = {}
 

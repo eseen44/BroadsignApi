@@ -29,7 +29,7 @@ from Pipeline.bronze.fetch_direct import (
     fetch_fill_rate,
     fetch_users,
 )
-from Pipeline.bronze.fetch_control import fetch_all_control
+from Pipeline.bronze.fetch_control import fetch_all_control, fetch_reservations_v22
 from Pipeline.bronze.fetch_play_logs import import_historical, fetch_incremental, fetch_resources
 
 
@@ -87,6 +87,14 @@ def run():
     ctrl_results = fetch_all_control(control)
     for name, r in ctrl_results.items():
         results[f"ctrl_{name}"] = "OK" if r["ok"] else f"FAIL: {r.get('error')}"
+
+    print("\n[ctrl_reservations_v22 — proposal_line_item_id]")
+    try:
+        r = fetch_reservations_v22(control)
+        results["ctrl_reservations_v22"] = f"OK ({r['rows']} wierszy)" if r["ok"] else f"FAIL"
+    except Exception as e:
+        print(f"  BLAD: {e}")
+        results["ctrl_reservations_v22"] = f"FAIL: {e}"
 
     # ------------------------------------------------------------------
     # 3. Play logi — import historyczny + incremental z popstats
