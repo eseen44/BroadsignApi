@@ -4,16 +4,16 @@ Gold pipeline — orchestrator.
 Uruchomienie:
     python Pipeline/gold/run_all.py
 
-Wejście:  Data/bronze/*.parquet + Data/silver/*.parquet
-Wyjście:  Data/gold/*.parquet  (star schema)
+Wejscie:  Data/bronze/*.parquet + Data/silver/*.parquet
+Wyjscie:  Data/gold/*.parquet  (star schema)
 
 Tabele:
-  dim_date             — kalendarz
-  dim_campaign_full    — kampania × lineitem × rezerwacja (z wierszami korygującymi)
-  dim_screen           — ekran + frame
-  dim_player           — player + display_unit
-  dim_content          — treść/kreacja
-  fact_play_logs       — emisje (slim: klucze + miary)
+  dim_date          — kalendarz
+  dim_campaign      — kampania (jedna na kampanie)
+  dim_line_item     — line item + rezerwacja
+  dim_player        — player + display_unit
+  dim_content       — tresc/kreacja
+  fact_play_logs    — emisje (slim: klucze + miary + campaign_id)
   fact_campaign_budget — koszt dzienny per player per lineitem
 """
 import sys
@@ -24,15 +24,16 @@ from datetime import datetime
 from Pipeline.gold.build_dims import (
     build_dim_date, build_dim_screen, build_dim_player, build_dim_content
 )
-from Pipeline.gold.build_dim_campaign_full import build_dim_campaign_full
+from Pipeline.gold.build_dim_campaign import build_dim_campaign
+from Pipeline.gold.build_dim_line_item import build_dim_line_item
 from Pipeline.gold.build_fact_play_logs import build_fact_play_logs
 from Pipeline.gold.build_fact_budget import build_fact_budget
 
 
 STEPS = [
     ("dim_date",             build_dim_date),
-    ("dim_campaign_full",    build_dim_campaign_full),
-    ("dim_screen",           build_dim_screen),
+    ("dim_campaign",         build_dim_campaign),
+    ("dim_line_item",        build_dim_line_item),
     ("dim_player",           build_dim_player),
     ("dim_content",          build_dim_content),
     ("fact_play_logs",       build_fact_play_logs),

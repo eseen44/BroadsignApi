@@ -16,6 +16,9 @@ GOLD_DIR   = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
 GOLD_DIR.mkdir(parents=True, exist_ok=True)
 
+# Kampanie wykluczone z raportowania budżetowego i play_logs
+EXCLUDED_CAMPAIGN_IDS = {2617443}  # autopromocja
+
 
 def read_bronze(name: str) -> pd.DataFrame:
     return pd.read_parquet(BRONZE_DIR / f"{name}.parquet")
