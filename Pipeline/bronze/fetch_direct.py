@@ -21,7 +21,7 @@ from Package.direct.proposals import get_all_proposals
 from Package.direct.proposal_items import get_all_proposal_items
 from Package.direct.inventory import get_all_screens, get_screens_frames_mapping
 from Package.direct.reporting import get_all_fill_rate
-from Pipeline.bronze.utils import save_parquet
+from Pipeline.bronze.utils import save_parquet, upsert_parquet
 
 FILL_RATE_DAYS = 28  # ile dni wstecz dla fill_rate — API max: 1 miesiąc
 
@@ -30,14 +30,14 @@ def fetch_proposals(session):
     print("Proposals...")
     records = get_all_proposals(session)
     df = pd.DataFrame(records)
-    return save_parquet(df, "proposals")
+    return upsert_parquet(df, "proposals", key_col="id")
 
 
 def fetch_proposal_items(session):
     print("Proposal items...")
     records = get_all_proposal_items(session)
     df = pd.DataFrame(records)
-    return save_parquet(df, "proposal_items")
+    return upsert_parquet(df, "proposal_items", key_col="id")
 
 
 def fetch_screens(session):

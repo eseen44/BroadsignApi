@@ -109,6 +109,13 @@ def upsert_parquet(df: pd.DataFrame, name: str, key_col: str = "id") -> Path:
         merged = pd.concat([keep, df], ignore_index=True)
         new_count = len(df)
         total = len(merged)
+        # Napraw niezgodnosci typow: jezeli kolumna ma mieszane typy -> str
+        for col in merged.columns:
+            if merged[col].dtype == object:
+                try:
+                    merged[col] = merged[col].astype(str).where(merged[col].notna(), other=None)
+                except Exception:
+                    pass
     else:
         merged = df
         new_count = len(df)

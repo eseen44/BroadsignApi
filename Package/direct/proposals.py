@@ -1,4 +1,12 @@
-SEARCH_URL = "https://direct.broadsign.com/api/v1/proposal/search"
+BASE_URL   = "https://direct.broadsign.com/api/v1"
+SEARCH_URL = f"{BASE_URL}/proposal/search"
+
+
+def get_proposal(session, proposal_id):
+    resp = session.get(f"{BASE_URL}/proposal/{proposal_id}")
+    if not resp.ok:
+        raise Exception(f"Blad API: {resp.status_code} {resp.text}")
+    return resp.json()
 PAGE_SIZE = 100
 
 

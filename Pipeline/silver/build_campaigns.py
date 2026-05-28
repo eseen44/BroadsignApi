@@ -19,6 +19,14 @@ def build_campaigns() -> pd.DataFrame:
     props = read_bronze("proposals")
     users = read_bronze("users")
 
+    # GET /proposal/proposal_item/{id} zwraca 'proposal_id' zamiast 'campaign_id'
+    # Normalizuj: jezeli campaign_id jest NULL a proposal_id istnieje — uzyj proposal_id
+    if "proposal_id" in items.columns and "campaign_id" in items.columns:
+        mask = items["campaign_id"].isna() & items["proposal_id"].notna()
+        items.loc[mask, "campaign_id"] = items.loc[mask, "proposal_id"]
+    elif "proposal_id" in items.columns and "campaign_id" not in items.columns:
+        items = items.rename(columns={"proposal_id": "campaign_id"})
+
     # ----------------------------------------------------------------
     # Rozpakuj JSON-string kolumny w proposal_items
     # ----------------------------------------------------------------
@@ -82,6 +90,7 @@ def build_campaigns() -> pd.DataFrame:
 
     # ----------------------------------------------------------------
     # JOIN items → proposals
+    # proposal_id i campaign_id to to samo pole — GET endpoint uzywa proposal_id
     # ----------------------------------------------------------------
     df = items_slim.merge(props_slim, on="campaign_id", how="left", suffixes=("_item", "_camp"))
 
