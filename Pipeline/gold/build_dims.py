@@ -20,34 +20,59 @@ from Pipeline.gold.utils import read_bronze, read_silver, save_gold
 # ---------------------------------------------------------------------------
 
 import re as _re
-_CODE_PATTERN = _re.compile(r'^([A-Z]\d+[A-Z]?|TP\d*|DMB\d+|[A-Z]{1,3}\d+)$')
+
+# Kody techniczne: A01, C11, TP, TP05, DMB, DMB03, CD, B9D itp.
+# UWAGA: czyste akronimy bez cyfr (ONZ, PKP) NIE są kodami — są częścią nazwy stacji
+_CODE_PATTERN = _re.compile(r'^(TP\d*|DMB\d*|CD|CA|[A-Z]{1,2}\d+[A-Z]?)$')
+# Słowa kończące wyciąganie nazwy stacji (kierunki + "cała stacja")
+# 'pónoc' — literówka w danych źródłowych (brak ł)
+_STOP_WORDS   = {'północ', 'południe', 'wschód', 'zachód', 'polnoc', 'poludnie',
+                 'pónoc',  # literówka w źródle
+                 'cała', 'stacja'}
 
 
 def _lokalizacja(series: pd.Series) -> pd.Series:
     """
-    Wyciąga nazwę stacji metro ze środka nazwy.
+    Wyciąga nazwę stacji metro ze środka nazwy display_unit.
 
-    Obsługuje dwa formaty:
-      underscore: A01_Kabaty_TP05_południe     → "Kabaty"  (segment [1])
-                  A01_TP_Kabaty_północ          → "Kabaty"  (pierwszy nie-kod)
-                  C11_Świętokrzyska_DMB02       → "Świętokrzyska"
-      spacja:     "Subway Entrance"             → "Entrance" (fallback)
-
-    Pomija segmenty wyglądające jak kody techniczne (A01, TP, DMB03 itp.).
+    Formaty:
+      A01_Kabaty_TP05_południe        → "Kabaty"
+      A01_TP_Kabaty_północ            → "Kabaty"
+      A10_TP_Pole_Mokotowskie_północ  → "Pole Mokotowskie"
+      C11_Świętokrzyska_DMB02         → "Świętokrzyska"
+      C13_DMB_Centrum_Nauk_Kopernik_cała_stacja → "Centrum Nauk Kopernik"
+      B9D | Plac Konstytucji | id     → "Plac Konstytucji"  (pipe-format)
+      "Subway Entrance"               → "Entrance"          (spacja-fallback)
     """
     def _extract(val):
         if not isinstance(val, str):
             return None
+
+        # Pipe-format: billboardy "B18D | Ulica/Adres | ID"
+        if " | " in val:
+            parts = val.split(" | ")
+            return parts[1].strip() if len(parts) >= 2 else None
+
         if "_" in val:
             parts = val.split("_")
-            # Zwróć pierwszy segment który NIE jest kodem technicznym
-            for part in parts[1:]:   # pomijamy segment [0] (kod sali/sekcji)
-                if part and not _CODE_PATTERN.match(part):
-                    return part
-            return None
-        # Fallback: spacja (stare nazwy bez podkreśleń)
+            station_parts = []
+            for part in parts[1:]:              # pomijamy [0] (kod sekcji)
+                if not part:
+                    continue
+                low = part.lower()
+                if low in _STOP_WORDS:
+                    break                        # słowo kończące = stop
+                if _CODE_PATTERN.match(part):
+                    if station_parts:            # kod po nazwie = koniec
+                        break
+                    continue                     # kod przed nazwą = pomijamy
+                station_parts.append(part)
+            return " ".join(station_parts) if station_parts else None
+
+        # Fallback: spacja
         parts = val.split(" ")
         return parts[1] if len(parts) >= 2 else None
+
     return series.apply(_extract)
 
 
