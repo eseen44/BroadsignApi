@@ -7,13 +7,19 @@ Dwa typy plikow:
   resources-YYYY-MM-DD.txt[.gz] — slownik ID->Nazwa dla wszystkich obiektow
 """
 import io
+import os
 import gzip
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+load_dotenv()
 
 URL_BASE = "https://popstats.broadsign.com/stroer_polska/"
-USERNAME  = "stroer_polska"
-PASSWORD  = "***REMOVED***"
+USERNAME  = os.getenv("POPSTATS_USERNAME", "stroer_polska")
+PASSWORD  = os.getenv("POPSTATS_PASSWORD")
+if not PASSWORD:
+    raise EnvironmentError("Brak POPSTATS_PASSWORD w .env")
 
 # Mapowanie kolumn surowego pliku playlog .txt
 RAW_COLS = {
