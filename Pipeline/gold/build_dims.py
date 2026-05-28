@@ -223,6 +223,13 @@ def build_dim_player():
 
     df["Lokalizacja"] = _lokalizacja(df["display_unit_name"])
 
+    # Flaga nośników testowych / biurowych (łatwe filtrowanie w PBI)
+    _test_pat = _re.compile(r'biuro|test', _re.IGNORECASE)
+    df["is_test"] = df["display_unit_name"].apply(
+        lambda v: bool(_test_pat.search(v)) if isinstance(v, str) else False
+    )
+    print(f"  Nosniki testowe (is_test=True): {df['is_test'].sum()}")
+
     save_gold(df, "dim_player")
 
 
