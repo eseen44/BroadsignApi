@@ -22,6 +22,11 @@ EXCLUDED_CAMPAIGN_IDS = {
     2223525,  # czas dla metra (niekomercyjne komunikaty, umowa z metro)
 }
 
+# Rezerwacje wykluczone po reservation_id (brak campaign_id — nie da sie mapowac)
+EXCLUDED_RESERVATION_IDS = {
+    1125116202,  # TrainArrivingMessage — systemowy komunikat (jak czas dla metra)
+}
+
 
 def read_bronze(name: str) -> pd.DataFrame:
     return pd.read_parquet(BRONZE_DIR / f"{name}.parquet")

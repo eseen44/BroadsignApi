@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
-from Pipeline.gold.utils import read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS
+from Pipeline.gold.utils import read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS, EXCLUDED_RESERVATION_IDS
 
 GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
@@ -87,13 +87,20 @@ def build_fact_play_logs():
     df = df.merge(res_camp, on="reservation_id", how="left")
 
     # ------------------------------------------------------------------
-    # Wyklucz autopromocje
+    # Wyklucz po campaign_id (autopromocja, czas dla metra...)
     # ------------------------------------------------------------------
     before = len(df)
     df = df[~df["campaign_id"].isin(EXCLUDED_CAMPAIGN_IDS)]
     excluded = before - len(df)
     if excluded:
-        print(f"  Wykluczono autopromocja: {excluded:,} wierszy")
+        print(f"  Wykluczono wg campaign_id: {excluded:,} wierszy")
+
+    # Wyklucz po reservation_id (brak campaign_id — systemowe komunikaty)
+    before = len(df)
+    df = df[~df["reservation_id"].isin(EXCLUDED_RESERVATION_IDS)]
+    excluded = before - len(df)
+    if excluded:
+        print(f"  Wykluczono wg reservation_id: {excluded:,} wierszy")
 
     print(f"  Wierszy: {len(df):,}")
     save_gold(df, "fact_play_logs")
