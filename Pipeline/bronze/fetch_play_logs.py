@@ -20,7 +20,7 @@ from Package.popstats.client import (
     get_session, list_playlog_files, list_resource_files,
     fetch_and_parse, fetch_resources_latest, filename_to_date,
 )
-from Pipeline.bronze.utils import append_parquet, load_cursors, save_cursor, save_parquet
+from Pipeline.bronze.utils import append_parquet, upsert_parquet, load_cursors, save_cursor, save_parquet
 
 HISTORICAL_CSV = (
     Path.home()
@@ -167,7 +167,7 @@ def fetch_resources(session=None) -> int:
         session = get_session()
 
     df = fetch_resources_latest(session)
-    save_parquet(df, "resources_latest")
+    upsert_parquet(df, "resources_latest", key_col="id")
     return len(df)
 
 
