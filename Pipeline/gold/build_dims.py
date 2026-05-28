@@ -19,11 +19,33 @@ from Pipeline.gold.utils import read_bronze, read_silver, save_gold
 # Text.BetweenDelimiters([Player], " ", " ", 0, 1)
 # ---------------------------------------------------------------------------
 
+import re as _re
+_CODE_PATTERN = _re.compile(r'^([A-Z]\d+[A-Z]?|TP\d*|DMB\d+|[A-Z]{1,3}\d+)$')
+
+
 def _lokalizacja(series: pd.Series) -> pd.Series:
-    """Wyciąga drugi wyraz z nazwy (między 1. a 2. spacją)."""
+    """
+    Wyciąga nazwę stacji metro ze środka nazwy.
+
+    Obsługuje dwa formaty:
+      underscore: A01_Kabaty_TP05_południe     → "Kabaty"  (segment [1])
+                  A01_TP_Kabaty_północ          → "Kabaty"  (pierwszy nie-kod)
+                  C11_Świętokrzyska_DMB02       → "Świętokrzyska"
+      spacja:     "Subway Entrance"             → "Entrance" (fallback)
+
+    Pomija segmenty wyglądające jak kody techniczne (A01, TP, DMB03 itp.).
+    """
     def _extract(val):
         if not isinstance(val, str):
             return None
+        if "_" in val:
+            parts = val.split("_")
+            # Zwróć pierwszy segment który NIE jest kodem technicznym
+            for part in parts[1:]:   # pomijamy segment [0] (kod sali/sekcji)
+                if part and not _CODE_PATTERN.match(part):
+                    return part
+            return None
+        # Fallback: spacja (stare nazwy bez podkreśleń)
         parts = val.split(" ")
         return parts[1] if len(parts) >= 2 else None
     return series.apply(_extract)
