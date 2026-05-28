@@ -9,7 +9,7 @@ Wyjście:  Data/gold/*.parquet  (star schema)
 
 Tabele:
   dim_date             — kalendarz
-  dim_campaign         — kampania + lineitem (ceny, daty, owner)
+  dim_campaign_full    — kampania × lineitem × rezerwacja (z wierszami korygującymi)
   dim_screen           — ekran + frame
   dim_player           — player + display_unit
   dim_content          — treść/kreacja
@@ -21,14 +21,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from datetime import datetime
-from Pipeline.gold.build_dims import build_dim_date, build_dim_campaign, build_dim_screen, build_dim_player, build_dim_content
+from Pipeline.gold.build_dims import (
+    build_dim_date, build_dim_screen, build_dim_player, build_dim_content
+)
+from Pipeline.gold.build_dim_campaign_full import build_dim_campaign_full
 from Pipeline.gold.build_fact_play_logs import build_fact_play_logs
 from Pipeline.gold.build_fact_budget import build_fact_budget
 
 
 STEPS = [
     ("dim_date",             build_dim_date),
-    ("dim_campaign",         build_dim_campaign),
+    ("dim_campaign_full",    build_dim_campaign_full),
     ("dim_screen",           build_dim_screen),
     ("dim_player",           build_dim_player),
     ("dim_content",          build_dim_content),
