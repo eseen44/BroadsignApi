@@ -1,5 +1,7 @@
 .env
 cookies.json
+CLAUDE.md
+.claude/
 __pycache__/
 *.pyc
 .spyproject/
