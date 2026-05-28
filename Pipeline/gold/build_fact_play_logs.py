@@ -95,12 +95,17 @@ def build_fact_play_logs():
     if excluded:
         print(f"  Wykluczono wg campaign_id: {excluded:,} wierszy")
 
-    # Wyklucz po reservation_id (brak campaign_id — systemowe komunikaty)
+    # Wyklucz po reservation_id (explicite wymienione)
     before = len(df)
     df = df[~df["reservation_id"].isin(EXCLUDED_RESERVATION_IDS)]
     excluded = before - len(df)
     if excluded:
         print(f"  Wykluczono wg reservation_id: {excluded:,} wierszy")
+
+    # Wyklucz wszystkie bez campaign_id (Control-only reservations, stare bez v22)
+    before = len(df)
+    df = df[df["campaign_id"].notna()]
+    print(f"  Wykluczono NULL campaign_id:  {before - len(df):,} wierszy")
 
     print(f"  Wierszy: {len(df):,}")
     save_gold(df, "fact_play_logs")
