@@ -17,7 +17,10 @@ GOLD_DIR   = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 GOLD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Kampanie wykluczone z raportowania budżetowego i play_logs
-EXCLUDED_CAMPAIGN_IDS = {2617443}  # autopromocja
+EXCLUDED_CAMPAIGN_IDS = {
+    2617443,  # autopromocja
+    2223525,  # czas dla metra (niekomercyjne komunikaty, umowa z metro)
+}
 
 
 def read_bronze(name: str) -> pd.DataFrame:

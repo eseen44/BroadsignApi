@@ -64,17 +64,25 @@ def build_fact_play_logs():
     })
 
     # ------------------------------------------------------------------
-    # Dociagnij campaign_id z dim_line_item (reservation_id -> campaign_id)
+    # Dociagnij campaign_id z silver (pelne dane, bez filtrowania kampanii)
+    # zeby wykluczenie dzialalo tez dla kampanii wyjetych z dim_line_item
     # ------------------------------------------------------------------
-    li_path = GOLD_DIR / "dim_line_item.parquet"
-    if not li_path.exists():
-        from Pipeline.gold.build_dim_line_item import build_dim_line_item
-        build_dim_line_item()
+    from Pipeline.gold.utils import read_silver as _read_silver
+    res_camp = _read_silver("campaigns")[["line_item_id", "campaign_id"]].copy()
+    res_camp["line_item_id"] = pd.to_numeric(res_camp["line_item_id"], errors="coerce").astype("Int64")
+    res_camp["campaign_id"]  = pd.to_numeric(res_camp["campaign_id"],  errors="coerce").astype("Int64")
 
-    res_camp = pd.read_parquet(li_path, columns=["reservation_id", "campaign_id"])
-    res_camp = res_camp.dropna(subset=["reservation_id"]).drop_duplicates(subset=["reservation_id"])
-    res_camp["reservation_id"] = res_camp["reservation_id"].astype("Int64")
-    res_camp["campaign_id"]    = res_camp["campaign_id"].astype("Int64")
+    # Potrzebujemy reservation_id -> campaign_id przez ctrl_reservations_v22
+    from Pipeline.gold.utils import read_bronze as _read_bronze
+    res22 = _read_bronze("ctrl_reservations_v22")[["id", "proposal_line_item_id"]].copy()
+    res22 = res22.rename(columns={"id": "reservation_id", "proposal_line_item_id": "line_item_id"})
+    res22["reservation_id"] = pd.to_numeric(res22["reservation_id"], errors="coerce").astype("Int64")
+    res22["line_item_id"]   = pd.to_numeric(res22["line_item_id"],   errors="coerce").astype("Int64")
+    res22 = res22.dropna()
+
+    res_camp = res22.merge(res_camp, on="line_item_id", how="left")
+    res_camp = res_camp[["reservation_id", "campaign_id"]].dropna(subset=["reservation_id"])
+    res_camp = res_camp.drop_duplicates(subset=["reservation_id"])
 
     df = df.merge(res_camp, on="reservation_id", how="left")
 
