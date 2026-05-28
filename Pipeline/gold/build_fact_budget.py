@@ -21,6 +21,10 @@ from Pipeline.gold.utils import read_bronze, save_gold, EXCLUDED_CAMPAIGN_IDS
 
 GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
+# Kap dat do zakresu dim_date (kampanie z end_date=2099 itp.)
+DATE_MIN = pd.Timestamp("2025-01-01")
+DATE_MAX = pd.Timestamp("2027-12-31")
+
 
 def build_fact_budget():
 
@@ -73,10 +77,12 @@ def build_fact_budget():
         res_id     = r["reservation_id"]
         line_price = float(r["line_price"]) if pd.notna(r["line_price"]) else 0.0
 
-        # Daty
+        # Daty — przycięte do zakresu dim_date
         try:
             date_range = pd.date_range(
-                start=r["line_start"], end=r["line_end"], freq="D"
+                start=max(pd.Timestamp(r["line_start"]), DATE_MIN),
+                end=min(pd.Timestamp(r["line_end"]),   DATE_MAX),
+                freq="D",
             )
         except Exception:
             date_range = []
