@@ -96,6 +96,12 @@ def upsert_parquet(df: pd.DataFrame, name: str, key_col: str = "id") -> Path:
     df["_fetched_at"] = _now()
     df = stringify_nested(df)
 
+    # Deduplikuj wejsciowy df po kluczu (API czasem zwraca duplikaty w jednym fetchu)
+    before = len(df)
+    df = df.drop_duplicates(subset=[key_col], keep="last")
+    if len(df) < before:
+        print(f"  -> [upsert] usunieto {before - len(df)} duplikatow w df wejsciowym (po {key_col})")
+
     if len(df) == 0:
         # Nic do upsertowania — nie dotykaj istniejącego pliku
         existing_count = len(pd.read_parquet(path)) if path.exists() else 0

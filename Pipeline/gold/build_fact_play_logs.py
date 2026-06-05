@@ -15,14 +15,14 @@ Klucze (FK do dim):
 Miary:
   emisje, Impresje, Duration
 
-Wykluczone: kampanie z EXCLUDED_CAMPAIGN_IDS (autopromocja).
+Flaga is_serwisowy=1 dla kampanii niekomercyjnych/serwisowych (można odfiltrowac w PBI).
 """
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
-from Pipeline.gold.utils import read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS, EXCLUDED_RESERVATION_IDS
+from Pipeline.gold.utils import read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS, EXCLUDED_RESERVATION_IDS, SERWISOWY_CAMPAIGN_IDS, SERWISOWY_RESERVATION_IDS, get_single_panel_campaign_ids
 
 GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
@@ -81,32 +81,32 @@ def build_fact_play_logs():
     res22 = res22.dropna()
 
     res_camp = res22.merge(res_camp, on="line_item_id", how="left")
-    res_camp = res_camp[["reservation_id", "campaign_id"]].dropna(subset=["reservation_id"])
+    res_camp = res_camp[["reservation_id", "line_item_id", "campaign_id"]].dropna(subset=["reservation_id"])
     res_camp = res_camp.drop_duplicates(subset=["reservation_id"])
 
     df = df.merge(res_camp, on="reservation_id", how="left")
 
     # ------------------------------------------------------------------
-    # Wyklucz po campaign_id (autopromocja, czas dla metra...)
-    # ------------------------------------------------------------------
-    before = len(df)
-    df = df[~df["campaign_id"].isin(EXCLUDED_CAMPAIGN_IDS)]
-    excluded = before - len(df)
-    if excluded:
-        print(f"  Wykluczono wg campaign_id: {excluded:,} wierszy")
-
-    # Wyklucz po reservation_id (explicite wymienione)
-    before = len(df)
-    df = df[~df["reservation_id"].isin(EXCLUDED_RESERVATION_IDS)]
-    excluded = before - len(df)
-    if excluded:
-        print(f"  Wykluczono wg reservation_id: {excluded:,} wierszy")
-
     # Wyklucz wszystkie bez campaign_id (Control-only reservations, stare bez v22)
+    # ------------------------------------------------------------------
     before = len(df)
     df = df[df["campaign_id"].notna()]
     print(f"  Wykluczono NULL campaign_id:  {before - len(df):,} wierszy")
 
+    # ------------------------------------------------------------------
+    # Flaga is_serwisowy: 1=serwisowe, 2=single-panel (test/diagnostyczne)
+    # ------------------------------------------------------------------
+    single_panel = get_single_panel_campaign_ids()
+
+    mask1 = df["campaign_id"].isin(SERWISOWY_CAMPAIGN_IDS) | df["reservation_id"].isin(SERWISOWY_RESERVATION_IDS)
+    mask2 = df["campaign_id"].isin(single_panel) & ~mask1
+    df["is_serwisowy"] = 0
+    df.loc[mask1, "is_serwisowy"] = 1
+    df.loc[mask2, "is_serwisowy"] = 2
+    df["is_serwisowy"] = df["is_serwisowy"].astype("int8")
+
+    print(f"  Oznaczono is_serwisowy=1:     {int(mask1.sum()):,} wierszy")
+    print(f"  Oznaczono is_serwisowy=2:     {int(mask2.sum()):,} wierszy")
     print(f"  Wierszy: {len(df):,}")
     save_gold(df, "fact_play_logs")
 

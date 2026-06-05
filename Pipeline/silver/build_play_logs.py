@@ -72,6 +72,10 @@ def build_play_logs(filter_zeros: bool = True) -> pd.DataFrame:
     du["DisplayUnitID"] = du["DisplayUnitID"].astype("Int64")
     pl = pl.merge(du, on="DisplayUnitID", how="left")
 
+    # Fallback: 42 frames ma null group_id w SFM, 37 nie ma w SFM w ogóle
+    # → łącznie ~9.6% wierszy bez screen_name. display_unit_name (Control API) ma 100% pokrycia.
+    pl["screen_name"] = pl["screen_name"].fillna(pl["display_unit_name"])
+
     # ----------------------------------------------------------------
     # 4. Kampania Direct API przez contract_id → proposals.contract_number
     # ----------------------------------------------------------------

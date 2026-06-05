@@ -12,10 +12,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
-from Pipeline.gold.utils import read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS
+from Pipeline.gold.utils import read_silver, save_gold, SERWISOWY_CAMPAIGN_IDS, get_single_panel_campaign_ids
 
 CAMP_COLS = [
-    "campaign_id", "campaign_name",
+    "campaign_id", "campaign_name", "campaign_status",
     "advertiser", "client_id", "client_name",
     "campaign_price", "campaign_suggested_price", "campaign_discount",
     "campaign_start", "campaign_end",
@@ -33,8 +33,13 @@ def build_dim_campaign():
     # Jeden wiersz per kampania
     df = df.drop_duplicates(subset=["campaign_id"])
 
-    # Wyklucz autopromocję i podobne
-    df = df[~df["campaign_id"].isin(EXCLUDED_CAMPAIGN_IDS)]
+    # Flaga is_serwisowy: 1=autopromocja/serwisowe, 2=single-panel (test/diagnostyczne)
+    single_panel = get_single_panel_campaign_ids()
+    df["is_serwisowy"] = df["campaign_id"].map(
+        lambda x: 1 if x in SERWISOWY_CAMPAIGN_IDS else (2 if x in single_panel else 0)
+    ).astype("int8")
+    print(f"  Serwisowe (1): {(df['is_serwisowy']==1).sum()}")
+    print(f"  Single-panel (2): {(df['is_serwisowy']==2).sum()}")
 
     for col in ["client_id", "owner_user_id"]:
         if col in df.columns:

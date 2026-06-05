@@ -7,10 +7,10 @@ Zrodlo: dim_line_item (line_price, daty, screen_count, reservation_id).
 Playerzy z play_logs: ktore PlayerID emitowaly dla CampID = reservation_id.
 Fallback gdy brak logow: screen_count wirtualnych slotow (player_id=NULL).
 
-Logika alokacji kosztu:
-  line_price / n_days / n_players -> daily_cost_line per wiersz
-
-Wykluczone: kampanie z EXCLUDED_CAMPAIGN_IDS (autopromocja).
+Logika alokacji kosztu i impresji:
+  line_price                / n_days / n_players -> daily_cost_line
+  perf_expected_impressions / n_days             -> daily_expected_impressions (niezależne od n_players)
+  perf_actual_impressions   / n_days             -> daily_actual_impressions   (Direct API)
 """
 import sys
 from pathlib import Path
@@ -39,7 +39,7 @@ def build_fact_budget():
     dli = pd.read_parquet(li_path, columns=[
         "campaign_id", "line_item_id", "reservation_id",
         "line_price", "line_start", "line_end", "line_days",
-        "screen_count",
+        "screen_count", "perf_expected_repetitions", "perf_actual_repetitions",
     ])
     dli["line_item_id"]   = pd.to_numeric(dli["line_item_id"],   errors="coerce").astype("Int64")
     dli["campaign_id"]    = pd.to_numeric(dli["campaign_id"],    errors="coerce").astype("Int64")
@@ -75,7 +75,9 @@ def build_fact_budget():
         line_id    = r["line_item_id"]
         camp_id    = r["campaign_id"]
         res_id     = r["reservation_id"]
-        line_price = float(r["line_price"]) if pd.notna(r["line_price"]) else 0.0
+        line_price    = float(r["line_price"])                    if pd.notna(r["line_price"])                    else 0.0
+        exp_imp       = float(r["perf_expected_repetitions"])    if pd.notna(r["perf_expected_repetitions"])    else 0.0
+        act_imp       = float(r["perf_actual_repetitions"])      if pd.notna(r["perf_actual_repetitions"])      else 0.0
 
         # Daty — przycięte do zakresu dim_date
         try:
@@ -101,20 +103,24 @@ def build_fact_budget():
             player_list = [None] * screen_cnt
 
         n_players = max(len(player_list), 1)
-        daily = line_price / n_days / n_players
+        daily_cost         = line_price / n_days / n_players
+        daily_exp_rep      = exp_imp / n_days   # oczekiwane repetycje (plays) na dzien
+        daily_act_rep      = act_imp / n_days   # faktyczne repetycje wg Direct API na dzien
 
         for day in date_range:
             day_str = day.strftime("%Y-%m-%d")
             for pid in player_list:
                 rows.append({
-                    "campaign_id":     camp_id,
-                    "line_item_id":    line_id,
-                    "reservation_id":  res_id,
-                    "player_id":       pid,
-                    "date":            day_str,
-                    "daily_cost_line": round(daily, 4),
-                    "n_days":          n_days,
-                    "n_players":       n_players,
+                    "campaign_id":                   camp_id,
+                    "line_item_id":                  line_id,
+                    "reservation_id":                res_id,
+                    "player_id":                     pid,
+                    "date":                          day_str,
+                    "daily_cost_line":               round(daily_cost, 4),
+                    "daily_expected_repetitions":    round(daily_exp_rep, 2),
+                    "daily_actual_repetitions":      round(daily_act_rep, 2),
+                    "n_days":                        n_days,
+                    "n_players":                     n_players,
                 })
 
     if not rows:
@@ -127,7 +133,8 @@ def build_fact_budget():
                 "n_days", "n_players"]:
         fact[col] = pd.to_numeric(fact[col], errors="coerce").astype("Int64")
 
-    fact["daily_cost_line"] = fact["daily_cost_line"].astype("float64")
+    for col in ["daily_cost_line", "daily_expected_repetitions", "daily_actual_repetitions"]:
+        fact[col] = fact[col].astype("float64")
 
     total       = len(fact)
     with_player = fact["player_id"].notna().sum()

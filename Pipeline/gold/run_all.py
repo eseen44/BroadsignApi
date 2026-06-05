@@ -28,6 +28,8 @@ from Pipeline.gold.build_dim_campaign import build_dim_campaign
 from Pipeline.gold.build_dim_line_item import build_dim_line_item
 from Pipeline.gold.build_fact_play_logs import build_fact_play_logs
 from Pipeline.gold.build_fact_budget import build_fact_budget
+from Pipeline.gold.build_fact_health import build_fact_health
+from Pipeline.gold.build_dim_campaign_period import build_dim_campaign_period
 
 
 STEPS = [
@@ -38,6 +40,8 @@ STEPS = [
     ("dim_content",          build_dim_content),
     ("fact_play_logs",       build_fact_play_logs),
     ("fact_campaign_budget", build_fact_budget),
+    ("fact_health",          build_fact_health),
+    ("dim_campaign_period",  build_dim_campaign_period),
 ]
 
 
