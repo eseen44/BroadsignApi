@@ -20,7 +20,7 @@ from Package.popstats.client import (
     get_session, list_playlog_files, list_resource_files,
     fetch_and_parse, fetch_resources_latest, filename_to_date,
 )
-from Pipeline.bronze.utils import append_parquet, upsert_parquet, load_cursors, save_cursor, save_parquet
+from Pipeline.bronze.utils import append_parquet, upsert_parquet, upsert_by_date, load_cursors, save_cursor, save_parquet
 
 HISTORICAL_CSV = (
     Path.home()
@@ -30,7 +30,8 @@ HISTORICAL_CSV = (
     / "ALL_PLAYLOGS_AGGREGATED.csv"
 )
 
-CURSORS_KEY = "play_logs_fetched_files"
+CURSORS_KEY       = "play_logs_fetched_files"   # legacy — zachowany dla czystosci kursora
+CURSORS_KEY_DATES = "play_logs_fetched_dates"   # dict {date_str -> source_filename}
 
 
 # ---------------------------------------------------------------------------
@@ -83,67 +84,49 @@ def import_historical(csv_path: Path = HISTORICAL_CSV) -> bool:
 
 def fetch_incremental(session=None) -> dict:
     """
-    Pobiera z popstats tylko te pliki których jeszcze nie mamy.
-    Sledzi pobrane pliki w _cursors.json.
+    Pobiera z popstats pliki których data nie jest jeszcze w kursorze.
 
-    Strategia:
-    - Jesli data pliku jest juz w play_logs.parquet -> oznacz jako pobrane bez downloadowania
-      (pokrywa pliki historyczne obecne w CSV, ktre teraz pojawiaja sie jako .gz na serwerze)
-    - Jesli data nowa -> pobierz, sparsuj, dodaj do parqueta
+    Strategia: kursor po DACIE jest jedynym gate'em — nie sprawdzamy co jest
+    w parquecie. Dzieki temu play_logs.parquet odzwierciedla dokladnie dane
+    z popstats URL, bez domieszki innych zrodel (playlog_history, CSV).
+
+    Cursor: play_logs_fetched_dates = {"2026-06-01": "playlog-2026-06-01.txt.gz", ...}
+    Kazda data moze byc reprezentowana przez .txt lub .txt.gz — cursor sladzi date,
+    nie nazwe pliku, wiec rotacja formatu nie powoduje ponownych downlooadow.
     """
-    from Pipeline.bronze.utils import BRONZE_DIR
-    import pandas as pd
-
     if session is None:
         session = get_session()
 
     cursors       = load_cursors()
-    fetched_files = set(cursors.get(CURSORS_KEY, []))
+    fetched_dates = cursors.get(CURSORS_KEY_DATES, {})   # dict: date_str -> filename
 
-    available = list_playlog_files(session)
-    new_files  = [f for f in available if f not in fetched_files]
+    available  = list_playlog_files(session)
+    new_files  = [f for f in available if filename_to_date(f) not in fetched_dates]
 
     if not new_files:
-        print(f"  [popstats] Brak nowych plikow (dostepne: {len(available)}, pobrane: {len(fetched_files)}).")
+        print(f"  [popstats] Brak nowych plikow (dostepne: {len(available)}, pobrane dat: {len(fetched_dates)}).")
         return {"new_files": 0, "new_rows": 0}
 
-    # Wczytaj juz istniejace daty z parqueta (jesli istnieje)
-    parquet_path = BRONZE_DIR / "play_logs.parquet"
-    existing_dates: set = set()
-    if parquet_path.exists():
-        existing_dates = set(
-            pd.read_parquet(parquet_path, columns=["DateEnd"])["DateEnd"]
-            .astype(str).unique()
-        ) - {"NaT", "nan", "None"}
-
     total_rows = 0
-    skipped = 0
     downloaded = 0
+    errors     = 0
 
     for filename in new_files:
         day = filename_to_date(filename)
-
-        if day in existing_dates:
-            # Data juz w parquecie (np. z historycznego CSV) — nie pobieraj
-            print(f"    Pomijam {filename} — dzien {day} juz w parquecie")
-            fetched_files.add(filename)
-            skipped += 1
-            save_cursor(CURSORS_KEY, sorted(fetched_files))
-            continue
-
         print(f"    Pobieranie {filename} (dzien: {day})...")
         try:
             df = fetch_and_parse(session, filename)
-            _, added = append_parquet(df, "play_logs", date_col="DateEnd")
+            _, added = upsert_by_date(df, "play_logs", date_col="DateEnd", date=day)
             total_rows += added
-            fetched_files.add(filename)
+            fetched_dates[day] = filename
             downloaded += 1
-            save_cursor(CURSORS_KEY, sorted(fetched_files))
+            save_cursor(CURSORS_KEY_DATES, fetched_dates)
         except Exception as e:
             print(f"    BLAD przy {filename}: {e}")
+            errors += 1
 
-    print(f"  [popstats] Pobrane: {downloaded}, pominiete (juz w parquecie): {skipped}")
-    return {"new_files": downloaded, "new_rows": total_rows}
+    print(f"  [popstats] Pobrane: {downloaded}, bledy: {errors}, nowe wiersze: {total_rows}")
+    return {"new_files": downloaded, "new_rows": total_rows, "errors": errors}
 
 
 # ---------------------------------------------------------------------------

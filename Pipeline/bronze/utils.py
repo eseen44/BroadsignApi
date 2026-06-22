@@ -133,13 +133,14 @@ def upsert_parquet(df: pd.DataFrame, name: str, key_col: str = "id") -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Strategia 3: append nowych dat (play_logs)
+# Strategia 3: append nowych dat (play_logs) — legacy, używane przez import_historical
 # ---------------------------------------------------------------------------
 
-def append_parquet(df: pd.DataFrame, name: str, date_col: str = "DateEnd") -> Path:
+def append_parquet(df: pd.DataFrame, name: str, date_col: str = "DateEnd") -> tuple:
     """
     Dorzuca wiersze których data (date_col) nie istnieje jeszcze w parquecie.
-    Używaj dla: play_logs.
+    Używaj dla: import_historical (bootstrap z CSV).
+    Dla codziennego fetch z popstats używaj upsert_by_date().
     """
     BRONZE_DIR.mkdir(parents=True, exist_ok=True)
     path = BRONZE_DIR / f"{name}.parquet"
@@ -165,3 +166,34 @@ def append_parquet(df: pd.DataFrame, name: str, date_col: str = "DateEnd") -> Pa
     merged.to_parquet(path, index=False, engine="pyarrow")
     print(f"  -> [append] +{len(new_rows)} wierszy -> lacznie {len(merged)} w {path.name}")
     return path, len(new_rows)
+
+
+# ---------------------------------------------------------------------------
+# Strategia 4: upsert po dacie (fetch z popstats — jedyne źródło prawdy)
+# ---------------------------------------------------------------------------
+
+def upsert_by_date(df: pd.DataFrame, name: str, date_col: str = "DateEnd", date: str = None) -> tuple:
+    """
+    Zastępuje wszystkie wiersze dla podanej daty nowymi danymi z popstats.
+    Używaj dla: fetch_incremental (codzienne pobieranie playlogów).
+
+    Gwarantuje że play_logs.parquet odzwierciedla dokładnie dane z URL —
+    bez domieszki danych z innych źródeł (playlog_history, CSV).
+    """
+    BRONZE_DIR.mkdir(parents=True, exist_ok=True)
+    path = BRONZE_DIR / f"{name}.parquet"
+
+    df = df.copy()
+    df["_fetched_at"] = _now()
+    df = stringify_nested(df)
+
+    if path.exists():
+        existing = pd.read_parquet(path)
+        keep = existing[existing[date_col].astype(str) != str(date)]
+        merged = pd.concat([keep, df], ignore_index=True)
+    else:
+        merged = df
+
+    merged.to_parquet(path, index=False, engine="pyarrow")
+    print(f"  -> [upsert_date] {date}: {len(df)} wierszy -> lacznie {len(merged)} w {path.name}")
+    return path, len(df)
