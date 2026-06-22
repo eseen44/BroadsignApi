@@ -45,6 +45,22 @@ STEPS = [
 ]
 
 
+ONEDRIVE_SYNC_DIR = Path("/dane/OneDrive/Pulpit/UbuntuSynch")
+
+
+def sync_to_onedrive(gold_dir: Path) -> None:
+    import shutil
+    if not ONEDRIVE_SYNC_DIR.exists():
+        print(f"  [sync] Pomijam — brak {ONEDRIVE_SYNC_DIR}")
+        return
+    copied = []
+    for f in sorted(gold_dir.glob("*.parquet")):
+        dest = ONEDRIVE_SYNC_DIR / f.name
+        shutil.copy2(f, dest)
+        copied.append(f.name)
+    print(f"  [sync] Skopiowano {len(copied)} plików do UbuntuSynch: {copied}")
+
+
 def run():
     start = datetime.now()
     print(f"{'='*55}")
@@ -74,6 +90,11 @@ def run():
         print(f"  OK   {k}")
     for k in fail:
         print(f"  FAIL {k}: {results[k]}")
+
+    if not fail:
+        gold_dir = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
+        print(f"\n[sync → OneDrive]")
+        sync_to_onedrive(gold_dir)
 
     return len(fail) == 0
 
