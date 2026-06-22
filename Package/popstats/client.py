@@ -45,22 +45,32 @@ def get_session() -> requests.Session:
 
 def _list_files(session: requests.Session, prefix: str) -> list[str]:
     """
-    Zwraca posortowana liste plikow .txt o danym prefixie (playlog / resources).
-    Ignoruje .txt.gz — serwer kompresuje starsze pliki, ale nasze dane
-    przyrastaja codziennie przez pobranie biezacego .txt.
-    Obsluga .gz jest zachowana w _fetch_text() jako safety net.
+    Zwraca posortowana liste plikow o danym prefixie (playlog / resources).
+    Zwraca zarowno .txt jak i .txt.gz — serwer kompresuje pliki starsze niz
+    kilka dni, wiec ignorowanie .gz powoduje ze pipeline traci dane po kompresji.
+    Jesli ten sam dzien istnieje jako .txt i .txt.gz, preferujemy .txt.
     """
     r = session.get(URL_BASE, timeout=15)
     r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
-    files = []
+    txt_files = set()
+    gz_files  = set()
     for a in soup.find_all("a"):
         href = a.get("href", "")
-        low = href.lower()
-        # tylko .txt, nie .txt.gz
-        if prefix in low and low.endswith(".txt") and not low.endswith(".txt.gz"):
-            files.append(href)
-    return sorted(files)
+        low  = href.lower()
+        if prefix not in low:
+            continue
+        if low.endswith(".txt.gz"):
+            gz_files.add(href)
+        elif low.endswith(".txt"):
+            txt_files.add(href)
+    # Dla dni gdzie jest .txt, nie dodawaj .txt.gz (unikamy duplikatów)
+    txt_dates = {filename_to_date(f) for f in txt_files}
+    result = list(txt_files)
+    for gz in gz_files:
+        if filename_to_date(gz) not in txt_dates:
+            result.append(gz)
+    return sorted(result)
 
 
 def list_playlog_files(session: requests.Session) -> list[str]:
