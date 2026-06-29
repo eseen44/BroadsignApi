@@ -86,12 +86,10 @@ def build_fact_play_logs():
 
     df = df.merge(res_camp, on="reservation_id", how="left")
 
-    # ------------------------------------------------------------------
-    # Wyklucz wszystkie bez campaign_id (Control-only reservations, stare bez v22)
-    # ------------------------------------------------------------------
-    before = len(df)
-    df = df[df["campaign_id"].notna()]
-    print(f"  Wykluczono NULL campaign_id:  {before - len(df):,} wierszy")
+    # NULL campaign_id = brak mapowania w v22 (stare kampanie, direct scheduling)
+    # Zostawiamy — dostaną is_serwisowy na podstawie reservation_id lub 0 (komercyjne)
+    null_count = df["campaign_id"].isna().sum()
+    print(f"  NULL campaign_id (zachowane): {null_count:,} wierszy")
 
     # ------------------------------------------------------------------
     # Flaga is_serwisowy: 1=serwisowe, 2=single-panel (test/diagnostyczne)

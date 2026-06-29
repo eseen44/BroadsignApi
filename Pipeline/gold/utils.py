@@ -39,6 +39,9 @@ SERWISOWY_CAMPAIGN_IDS = {
 # Rezerwacje serwisowe po reservation_id
 SERWISOWY_RESERVATION_IDS = {
     1125116202,  # TrainArrivingMessage — systemowy komunikat
+    1331907375,  # Promo Road mk2
+    1243202200,  # Roadside_Promo
+    1230744166,  # test_IT_synchro
 }
 
 # Zachowane dla kompatybilności wstecznej (puste — nic nie wykluczamy twardo)
