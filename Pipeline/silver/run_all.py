@@ -24,21 +24,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from datetime import datetime
 
-from Pipeline.silver.build_campaigns    import build_campaigns
-from Pipeline.silver.build_screens      import build_screens
-from Pipeline.silver.build_players      import build_players
-from Pipeline.silver.build_screen_bridge import build_screen_bridge
-from Pipeline.silver.build_play_logs    import build_play_logs
-from Pipeline.silver.build_fill_rate    import build_fill_rate
+from Pipeline.silver.build_campaigns      import build_campaigns
+from Pipeline.silver.build_screens        import build_screens
+from Pipeline.silver.build_players        import build_players
+from Pipeline.silver.build_screen_bridge  import build_screen_bridge
+from Pipeline.silver.build_play_logs      import build_play_logs
+from Pipeline.silver.build_fill_rate      import build_fill_rate
+from Pipeline.silver.build_magicinfo_pop  import build_magicinfo_pop
 
 
 STEPS = [
-    ("campaigns",       build_campaigns,    "proposal_items × proposals"),
-    ("screens_full",    build_screens,      "screens × screens_frames_mapping"),
-    ("players_full",    build_players,      "ctrl_players × ctrl_display_units"),
-    ("screen_bridge",   build_screen_bridge,"FrameID <-> DisplayUnitID z play_logs"),
-    ("play_logs_enr",   build_play_logs,    "play_logs + nazwy"),
-    ("fill_rate_clean", build_fill_rate,    "fill_rate + proposal_items"),
+    ("campaigns",        build_campaigns,     "proposal_items × proposals"),
+    ("screens_full",     build_screens,       "screens × screens_frames_mapping"),
+    ("players_full",     build_players,       "ctrl_players × ctrl_display_units"),
+    ("screen_bridge",    build_screen_bridge, "FrameID <-> DisplayUnitID z play_logs"),
+    ("play_logs_enr",    build_play_logs,     "play_logs + nazwy"),
+    ("fill_rate_clean",  build_fill_rate,     "fill_rate + proposal_items"),
+    ("magicinfo_pop",    build_magicinfo_pop, "MagicInfo PoP metro (liveline/stroertv/triplay)"),
 ]
 
 
