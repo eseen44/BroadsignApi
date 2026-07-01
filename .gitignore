@@ -1,5 +1,6 @@
 .env
 cookies.json
+magicinfo_token.json
 CLAUDE.md
 .claude/
 __pycache__/
