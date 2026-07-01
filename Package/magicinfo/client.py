@@ -44,14 +44,14 @@ class MagicInfoClient:
         resp.raise_for_status()
         return resp.json()
 
-    def post(self, path: str, body: dict = None, params: dict = None) -> dict:
+    def post(self, path: str, body: dict = None, params: dict = None, timeout: int = 30) -> dict:
         resp = self._session.post(
-            self._url(path), headers=self._headers(), json=body, params=params, verify=False, timeout=30,
+            self._url(path), headers=self._headers(), json=body, params=params, verify=False, timeout=timeout,
         )
         if resp.status_code == 401:
             self._token = get_token(force_refresh=True)
             resp = self._session.post(
-                self._url(path), headers=self._headers(), json=body, params=params, verify=False, timeout=30,
+                self._url(path), headers=self._headers(), json=body, params=params, verify=False, timeout=timeout,
             )
         resp.raise_for_status()
         return resp.json()
