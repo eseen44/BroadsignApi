@@ -5,11 +5,17 @@ import pandas as pd
 import pyarrow.parquet as pq
 from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path("/dane/BroadsignApi/.env"))
 
 # ── KONFIGURACJA ──────────────────────────────────────────────────────────────
 URL_BASE  = "https://popstats.broadsign.com/stroer_polska/"
-USERNAME  = "stroer_polska"
-PASSWORD  = "st9073f8b4"
+USERNAME  = os.getenv("POPSTATS_USERNAME")
+PASSWORD  = os.getenv("POPSTATS_PASSWORD")
+
+if not USERNAME or not PASSWORD:
+    raise EnvironmentError("Brak POPSTATS_USERNAME/POPSTATS_PASSWORD w .env")
 
 BASE_DIR          = Path("/dane/Broadsign_Logs")
 TEMP_DIR          = Path("/tmp/broadsign_dl")

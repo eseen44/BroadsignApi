@@ -9,8 +9,12 @@ Fallback gdy brak logow: screen_count wirtualnych slotow (player_id=NULL).
 
 Logika alokacji kosztu i impresji:
   line_price                / n_days / n_players -> daily_cost_line
-  perf_expected_impressions / n_days             -> daily_expected_impressions (niezależne od n_players)
-  perf_actual_impressions   / n_days             -> daily_actual_impressions   (Direct API)
+  perf_expected_repetitions / n_days / n_players -> daily_expected_repetitions
+  perf_actual_repetitions   / n_days / n_players -> daily_actual_repetitions   (Direct API)
+
+Uwaga: wiersz jest powielany raz na playera (player_id), wiec kazda z powyzszych
+wartosci musi byc podzielona przez n_players - inaczej SUM() po tej tabeli
+zawyza wynik o czynnik n_players (bug naprawiony 2026-07-07).
 """
 import sys
 from pathlib import Path
@@ -104,8 +108,8 @@ def build_fact_budget():
 
         n_players = max(len(player_list), 1)
         daily_cost         = line_price / n_days / n_players
-        daily_exp_rep      = exp_imp / n_days   # oczekiwane repetycje (plays) na dzien
-        daily_act_rep      = act_imp / n_days   # faktyczne repetycje wg Direct API na dzien
+        daily_exp_rep      = exp_imp / n_days / n_players   # oczekiwane repetycje (plays) na dzien na playera
+        daily_act_rep      = act_imp / n_days / n_players   # faktyczne repetycje wg Direct API na dzien na playera
 
         for day in date_range:
             day_str = day.strftime("%Y-%m-%d")
