@@ -31,6 +31,11 @@ from Pipeline.bronze.fetch_direct import (
 )
 from Pipeline.bronze.fetch_control import fetch_all_control, fetch_reservations_v22
 from Pipeline.bronze.fetch_play_logs import import_historical, fetch_incremental, fetch_resources
+from Pipeline.bronze.fetch_magicinfo import main as fetch_magicinfo
+
+# Kroki, ktorych FAIL nie blokuje reszty pipeline'u (Silver/Gold nie zaleza
+# jeszcze od ich wyniku).
+NON_CRITICAL = {"magicinfo_pop"}
 
 
 def run():
@@ -127,20 +132,34 @@ def run():
         results["resources_latest"] = f"FAIL: {e}"
 
     # ------------------------------------------------------------------
+    # 4. MagicInfo — PoP metro (liveline/stroertv/triplay), niekrytyczne
+    # ------------------------------------------------------------------
+    print("\n--- MagicInfo (metro PoP) ---")
+    print("\n[magicinfo_pop]")
+    try:
+        fetch_magicinfo()
+        results["magicinfo_pop"] = "OK"
+    except Exception as e:
+        print(f"  BLAD: {e}")
+        results["magicinfo_pop"] = f"FAIL: {e}"
+
+    # ------------------------------------------------------------------
     # Podsumowanie
     # ------------------------------------------------------------------
     elapsed = (datetime.now() - start).seconds
     print(f"\n{'='*55}")
     print(f"  Koniec ({elapsed}s)")
     print(f"{'='*55}")
-    ok = [k for k, v in results.items() if v.startswith("OK")]
+    ok   = [k for k, v in results.items() if v.startswith("OK")]
     fail = [k for k, v in results.items() if not v.startswith("OK")]
+    critical_fail = [k for k in fail if k not in NON_CRITICAL]
     for k in ok:
         print(f"  OK   {k}: {results[k]}")
     for k in fail:
-        print(f"  FAIL {k}: {results[k]}")
+        tag = "FAIL (non-critical)" if k in NON_CRITICAL else "FAIL"
+        print(f"  {tag} {k}: {results[k]}")
 
-    return len(fail) == 0
+    return len(critical_fail) == 0
 
 
 if __name__ == "__main__":

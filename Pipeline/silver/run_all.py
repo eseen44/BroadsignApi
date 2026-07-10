@@ -43,6 +43,11 @@ STEPS = [
     ("magicinfo_pop",    build_magicinfo_pop, "MagicInfo PoP metro (liveline/stroertv/triplay)"),
 ]
 
+# Kroki, których FAIL nie blokuje Gold (nie ma jeszcze na nich zależnych
+# tabel Gold). magicinfo_pop wymaga Bronze fetch, który obecnie nie jest
+# uruchamiany na VM — dopóki to się nie zmieni, jego FAIL jest oczekiwany.
+NON_CRITICAL = {"magicinfo_pop"}
+
 
 def run():
     start = datetime.now()
@@ -70,12 +75,14 @@ def run():
 
     ok   = [k for k, v in results.items() if v == "OK"]
     fail = [k for k, v in results.items() if v != "OK"]
+    critical_fail = [k for k in fail if k not in NON_CRITICAL]
     for k in ok:
         print(f"  OK   {k}")
     for k in fail:
-        print(f"  FAIL {k}: {results[k]}")
+        tag = "FAIL (non-critical)" if k in NON_CRITICAL else "FAIL"
+        print(f"  {tag} {k}: {results[k]}")
 
-    return len(fail) == 0
+    return len(critical_fail) == 0
 
 
 if __name__ == "__main__":
