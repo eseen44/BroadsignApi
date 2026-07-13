@@ -12,7 +12,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
-from Pipeline.gold.utils import read_silver, save_gold, SERWISOWY_CAMPAIGN_IDS, get_single_panel_campaign_ids
+from Pipeline.gold.utils import (
+    read_silver, save_gold, SERWISOWY_CAMPAIGN_IDS, get_single_panel_campaign_ids,
+    EXCLUDED_CAMPAIGN_IDS,
+)
 
 CAMP_COLS = [
     "campaign_id", "campaign_name", "campaign_status",
@@ -32,6 +35,9 @@ def build_dim_campaign():
 
     # Jeden wiersz per kampania
     df = df.drop_duplicates(subset=["campaign_id"])
+
+    # Kampanie twardo wykluczone (stare/nieaktualne dane) — patrz utils.py
+    df = df[~df["campaign_id"].isin(EXCLUDED_CAMPAIGN_IDS)]
 
     # Flaga is_serwisowy: 1=autopromocja/serwisowe, 2=single-panel (test/diagnostyczne)
     single_panel = get_single_panel_campaign_ids()

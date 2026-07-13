@@ -26,6 +26,14 @@ OD NOWA ze skorygowanego actual (a nie z Direct API), bo oryginalny expected
 to sztywny szablon (~60-1080/dzien niezaleznie od skali kampanii) bez zadnego
 zwiazku z rzeczywistoscia -- patrz analiza w sesji z 2026-07-13. Kazda inna
 kombinacja format/pole zostaje nietknieta.
+
+Format LiveLine/StroerTV jest okreslany na podstawie line_item_name (nie
+plyera z play_logs!) -- pierwsza wersja korekty lapala tylko wiersze z
+dopasowanym play_log_player_id, a wiele rezerwacji metra w ogole nie ma
+zadnych logow w bronze play_logs (np. starsze kampanie), wiec traialy do
+fallbacku (player_id=NULL) i wychodzily z korekty calkowicie nietkniete --
+stad "glupoty" typu 278980% realizacji (naprawione 2026-07-13, patrz
+sesja).
 """
 import hashlib
 import sys
@@ -33,7 +41,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
-from Pipeline.gold.utils import read_bronze, read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS
+from Pipeline.gold.utils import read_bronze, save_gold, EXCLUDED_CAMPAIGN_IDS
 
 GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
@@ -61,11 +69,11 @@ EXP_FACTOR_LOW  = 1 / 1.13
 EXP_FACTOR_HIGH = 1 / 1.01
 
 
-def _metro_format(player_name) -> str | None:
-    """'liveline' / 'stroertv' / None na podstawie nazwy playera (jak dim_player[SubFormat])."""
-    if not isinstance(player_name, str):
+def _metro_format(line_item_name) -> str | None:
+    """'liveline' / 'stroertv' / None na podstawie line_item_name (np. 'LiveLine_PrimeTime_...')."""
+    if not isinstance(line_item_name, str):
         return None
-    n = player_name.lower()
+    n = line_item_name.lower()
     if "liveline" in n:
         return "liveline"
     if "stroertv" in n:
@@ -91,7 +99,7 @@ def build_fact_budget():
         build_dim_line_item()
 
     dli = pd.read_parquet(li_path, columns=[
-        "campaign_id", "line_item_id", "reservation_id",
+        "campaign_id", "line_item_id", "reservation_id", "line_item_name",
         "line_price", "line_start", "line_end", "line_days",
         "screen_count", "perf_expected_repetitions", "perf_actual_repetitions",
     ])
@@ -121,22 +129,6 @@ def build_fact_budget():
     res_players["reservation_id"] = res_players["reservation_id"].astype("Int64")
 
     # ------------------------------------------------------------------
-    # 2b. Mapa play_log_player_id -> format metra (liveline/stroertv/None)
-    # ------------------------------------------------------------------
-    players_full = read_silver("players_full")[["play_log_player_id", "player_name"]].copy()
-    players_full = players_full.dropna(subset=["play_log_player_id"])
-    players_full["play_log_player_id"] = pd.to_numeric(
-        players_full["play_log_player_id"], errors="coerce"
-    ).astype("Int64")
-    players_full["metro_format"] = players_full["player_name"].apply(_metro_format)
-    player_metro_format = {
-        pid: fmt
-        for pid, fmt in zip(players_full["play_log_player_id"], players_full["metro_format"])
-        if fmt is not None
-    }
-    print(f"  Playery LiveLine/StroerTV do korekty: {len(player_metro_format)}")
-
-    # ------------------------------------------------------------------
     # 3. Generuj wiersze: lineitem x date x player
     # ------------------------------------------------------------------
     rows = []
@@ -148,6 +140,7 @@ def build_fact_budget():
         line_price    = float(r["line_price"])                    if pd.notna(r["line_price"])                    else 0.0
         exp_imp       = float(r["perf_expected_repetitions"])    if pd.notna(r["perf_expected_repetitions"])    else 0.0
         act_imp       = float(r["perf_actual_repetitions"])      if pd.notna(r["perf_actual_repetitions"])      else 0.0
+        metro_fmt     = _metro_format(r["line_item_name"])
 
         # Daty — przycięte do zakresu dim_date
         try:
@@ -177,17 +170,15 @@ def build_fact_budget():
         daily_exp_rep      = exp_imp / n_days / n_players   # oczekiwane repetycje (plays) na dzien na playera
         daily_act_rep      = act_imp / n_days / n_players   # faktyczne repetycje wg Direct API na dzien na playera
 
+        act_val = daily_act_rep
+        exp_val = daily_exp_rep
+        if metro_fmt is not None:
+            act_val = daily_act_rep * ACT_CORRECTION[metro_fmt]
+            exp_val = act_val * _exp_factor_for_line(line_id)
+
         for day in date_range:
             day_str = day.strftime("%Y-%m-%d")
             for pid in player_list:
-                act_val = daily_act_rep
-                exp_val = daily_exp_rep
-
-                metro_fmt = player_metro_format.get(pid) if pid is not None else None
-                if metro_fmt is not None:
-                    act_val = daily_act_rep * ACT_CORRECTION[metro_fmt]
-                    exp_val = act_val * _exp_factor_for_line(line_id)
-
                 rows.append({
                     "campaign_id":                   camp_id,
                     "line_item_id":                  line_id,
