@@ -150,14 +150,26 @@ def fetch_month(mi: MagicInfoClient, content_meta: dict, year_month: str) -> pd.
 # ---------------------------------------------------------------------------
 
 def _upsert_month(df: pd.DataFrame, year_month: str) -> None:
+    """Upsert po kluczu (format, content_id, play_date) -- NIE po miesiacu.
+
+    MagicInfo ma rolling window ~31 dni: ponowne zapytanie o "ten sam"
+    miesiac moze dzis zwrocic mniej dni niz poprzednio (starsze dni wypadly
+    z okna API). Kasowanie calego miesiaca przed wstawieniem nowych danych
+    (jak bylo wczesniej) bezpowrotnie gubi dni, ktorych nowy fetch juz nie
+    pokrywa. Upsert po dokladnym kluczu wiersza nigdy nie usuwa danych,
+    ktorych nowy fetch po prostu nie dotyczy.
+    """
     BRONZE_DIR.mkdir(parents=True, exist_ok=True)
     path = BRONZE_DIR / f"{OUT_NAME}.parquet"
     df = df.copy()
     df["_fetched_at"] = datetime.now(timezone.utc).isoformat()
 
+    key_cols = ["format", "content_id", "play_date"]
+
     if path.exists():
         existing = pd.read_parquet(path)
-        keep = existing[~existing["play_date"].astype(str).str.startswith(year_month)]
+        new_keys = set(map(tuple, df[key_cols].itertuples(index=False, name=None)))
+        keep = existing[~existing[key_cols].apply(tuple, axis=1).isin(new_keys)]
         merged = pd.concat([keep, df], ignore_index=True)
     else:
         merged = df
