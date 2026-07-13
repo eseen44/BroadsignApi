@@ -28,6 +28,7 @@ SERWISOWY_CAMPAIGN_IDS = {
     2654184,   # Roadside_Promo (Stroer)
     3324704,   # Roadside_Promo (Stroer Polska)
     2617443,   # Autopromocja Liveline
+    2486500,   # LL-autopromo- test
     2534697,   # OMD autopromocja
     2288610,   # Kr/Wr autopromocja
     2108200,   # TrainArrivingMessage (Direct API)
@@ -44,8 +45,13 @@ SERWISOWY_RESERVATION_IDS = {
     1230744166,  # test_IT_synchro
 }
 
-# Zachowane dla kompatybilności wstecznej (puste — nic nie wykluczamy twardo)
-EXCLUDED_CAMPAIGN_IDS: set = set()
+# Kampanie twardo wykluczone z dim_line_item / fact_campaign_budget (stare/nieaktualne dane,
+# nie serwisowe -- to rozroznienie od SERWISOWY_CAMPAIGN_IDS: tamte zostaja w danych z flaga
+# is_serwisowy=1, te znikaja calkowicie).
+EXCLUDED_CAMPAIGN_IDS: set = {
+    2472239,   # Sokoliki 30.V-05.VI -- stara kampania, perf_actual_repetitions absurdalnie
+               # zawyzone (bez dopasowania do realnego play_log_player_id), 2026-07-13
+}
 EXCLUDED_RESERVATION_IDS: set = set()
 
 
