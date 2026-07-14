@@ -70,10 +70,18 @@ def save_parquet(df: pd.DataFrame, name: str) -> Path:
                 ctrl_players, ctrl_customers, ctrl_users, fill_rate.
     """
     BRONZE_DIR.mkdir(parents=True, exist_ok=True)
+    path = BRONZE_DIR / f"{name}.parquet"
+
+    if len(df) == 0 and path.exists():
+        # Pusta odpowiedz API nie moze skasowac istniejacych danych (zasada:
+        # nigdy nie tracimy danych, patrz incydent MagicInfo --force 2026-07-13).
+        existing_count = len(pd.read_parquet(path))
+        print(f"  -> [overwrite] BLOKUJE: df pusty, zostawiam {path.name} bez zmian ({existing_count} wierszy)")
+        return path
+
     df = df.copy()
     df["_fetched_at"] = _now()
     df = stringify_nested(df)
-    path = BRONZE_DIR / f"{name}.parquet"
     df.to_parquet(path, index=False, engine="pyarrow")
     print(f"  -> [overwrite] {len(df)} wierszy -> {path.name}")
     return path
