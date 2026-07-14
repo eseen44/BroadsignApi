@@ -37,6 +37,10 @@ _PRIORITY_PATTERNS = [
     ("Kraków",    _re.compile(r'Kraków',    _re.IGNORECASE)),
     ("Katowice",  _re.compile(r'Katowice',  _re.IGNORECASE)),
     ("Lotnisko",  _re.compile(r'Lotnisko',  _re.IGNORECASE)),
+    # LiveLine/StroerTV -- ekrany W WAGONACH metra (nie na stacjach), pojedyncze
+    # slowo w nazwie ("StroerTV"/"LiveLine") wiec fallback "drugie slowo" nic
+    # nie wyciaga -- user potwierdzil 2026-07-14 ze lokalizacja to "Wagony".
+    ("Wagony",    _re.compile(r'StroerTV|LiveLine', _re.IGNORECASE)),
     ("B9D",       _re.compile(r'B9D')),
     ("B18D",      _re.compile(r'B18D')),
     ("B36D",      _re.compile(r'B36D')),
@@ -224,7 +228,9 @@ def build_dim_player():
     df["Lokalizacja"] = _lokalizacja(df["display_unit_name"])
 
     # Flaga nośników testowych / biurowych (łatwe filtrowanie w PBI)
-    _test_pat = _re.compile(r'biuro|test', _re.IGNORECASE)
+    # "teltronic" dodane 2026-07-14 -- user potwierdzil ze to ekrany testowe
+    # (Teltronic_VPN_3, Teltronic_Solix_Trigger), mimo ze nazwa nie zawiera "test".
+    _test_pat = _re.compile(r'biuro|test|teltronic', _re.IGNORECASE)
     df["is_test"] = df.apply(
         lambda row: any(
             bool(_test_pat.search(v))
