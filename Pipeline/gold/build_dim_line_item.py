@@ -24,6 +24,7 @@ LI_COLS = [
     "buy_saturation", "buy_bs_saturation", "buy_sov", "buy_budget",
     "perf_expected_repetitions", "perf_actual_repetitions",
     "perf_expected_impressions", "perf_actual_impressions",
+    "perf_status",
     "line_start", "line_end",
 ]
 
@@ -38,6 +39,14 @@ def build_dim_line_item():
     df = camp[[c for c in LI_COLS if c in camp.columns]].copy()
     df["line_item_id"] = pd.to_numeric(df["line_item_id"], errors="coerce").astype("Int64")
     df["campaign_id"]  = pd.to_numeric(df["campaign_id"],  errors="coerce").astype("Int64")
+
+    # Status wydajnosci wg samego Broadsign (Direct API performance.status) --
+    # ON_TRACK / OVER_PERFORMING / UNDER_PERFORMING / brak (None -> "Brak danych").
+    # Do recznego odfiltrowania anomalii (np. Marwinka NP, 2026-07-14) -- Broadsign
+    # sam flaguje te przekroczenia, niezaleznie od naszej korekty LL/StroerTV.
+    if "perf_status" in df.columns:
+        df = df.rename(columns={"perf_status": "broadsign_status"})
+        df["broadsign_status"] = df["broadsign_status"].fillna("Brak danych")
 
     # Wyklucz autopromocję i podobne
     df = df[~df["campaign_id"].isin(EXCLUDED_CAMPAIGN_IDS)]
