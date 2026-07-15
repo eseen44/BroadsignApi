@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import pandas as pd
 from Pipeline.gold.utils import (
     read_silver, save_gold, SERWISOWY_CAMPAIGN_IDS, get_single_panel_campaign_ids,
-    EXCLUDED_CAMPAIGN_IDS,
+    EXCLUDED_CAMPAIGN_IDS, FORCE_SINGLE_PANEL_CAMPAIGN_IDS,
 )
 
 CAMP_COLS = [
@@ -40,7 +40,7 @@ def build_dim_campaign():
     df = df[~df["campaign_id"].isin(EXCLUDED_CAMPAIGN_IDS)]
 
     # Flaga is_serwisowy: 1=autopromocja/serwisowe, 2=single-panel (test/diagnostyczne)
-    single_panel = get_single_panel_campaign_ids()
+    single_panel = get_single_panel_campaign_ids() | FORCE_SINGLE_PANEL_CAMPAIGN_IDS
     df["is_serwisowy"] = df["campaign_id"].map(
         lambda x: 1 if x in SERWISOWY_CAMPAIGN_IDS else (2 if x in single_panel else 0)
     ).astype("int8")

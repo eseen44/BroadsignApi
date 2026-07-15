@@ -29,7 +29,6 @@ SERWISOWY_CAMPAIGN_IDS = {
     3324704,   # Roadside_Promo (Stroer Polska)
     2617443,   # Autopromocja Liveline
     2486500,   # LL-autopromo- test
-    2534697,   # OMD autopromocja
     2288610,   # Kr/Wr autopromocja
     2108200,   # TrainArrivingMessage (Direct API)
     3005804,   # Gromada
@@ -43,6 +42,13 @@ SERWISOWY_RESERVATION_IDS = {
     1331907375,  # Promo Road mk2
     1243202200,  # Roadside_Promo
     1230744166,  # test_IT_synchro
+}
+
+# Kampanie recznie wymuszone na is_serwisowy=2 (single-panel/testowe), mimo ze automatyczna
+# regula get_single_panel_campaign_ids() ich nie lapie (np. brak play_logs w ogole -> 0
+# unikalnych paneli, nie dokladnie 1, wiec regula "dokladnie 1 panel" nie zadziala).
+FORCE_SINGLE_PANEL_CAMPAIGN_IDS = {
+    2534697,   # OMD autopromocja -- 0 wierszy w play_logs, user chce is_serwisowy=2 (2026-07-14)
 }
 
 # Kampanie twardo wykluczone z dim_line_item / fact_campaign_budget (stare/nieaktualne dane,

@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
-from Pipeline.gold.utils import read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS, EXCLUDED_RESERVATION_IDS, SERWISOWY_CAMPAIGN_IDS, SERWISOWY_RESERVATION_IDS, get_single_panel_campaign_ids
+from Pipeline.gold.utils import read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS, EXCLUDED_RESERVATION_IDS, SERWISOWY_CAMPAIGN_IDS, SERWISOWY_RESERVATION_IDS, get_single_panel_campaign_ids, FORCE_SINGLE_PANEL_CAMPAIGN_IDS
 
 GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
@@ -94,7 +94,7 @@ def build_fact_play_logs():
     # ------------------------------------------------------------------
     # Flaga is_serwisowy: 1=serwisowe, 2=single-panel (test/diagnostyczne)
     # ------------------------------------------------------------------
-    single_panel = get_single_panel_campaign_ids()
+    single_panel = get_single_panel_campaign_ids() | FORCE_SINGLE_PANEL_CAMPAIGN_IDS
 
     mask1 = df["campaign_id"].isin(SERWISOWY_CAMPAIGN_IDS) | df["reservation_id"].isin(SERWISOWY_RESERVATION_IDS)
     mask2 = df["campaign_id"].isin(single_panel) & ~mask1
