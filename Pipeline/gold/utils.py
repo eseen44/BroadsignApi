@@ -27,6 +27,9 @@ SERWISOWY_CAMPAIGN_IDS = {
     2236243,   # Stroer Promo DMB
     2654184,   # Roadside_Promo (Stroer)
     3324704,   # Roadside_Promo (Stroer Polska)
+    2984174,   # Promo Road mk2 -- byla juz w SERWISOWY_RESERVATION_IDS (reservation 1331907375),
+               # ale brakowalo jej tu na poziomie campaign_id (niespojnosc dim_campaign vs
+               # fact_play_logs, znaleziona i potwierdzona przez usera 2026-07-15)
     2617443,   # Autopromocja Liveline
     2486500,   # LL-autopromo- test
     2288610,   # Kr/Wr autopromocja
