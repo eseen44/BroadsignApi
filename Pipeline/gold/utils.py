@@ -57,6 +57,15 @@ SERWISOWY_RESERVATION_IDS = {
     1230744166,  # test_IT_synchro
 }
 
+# Line itemy serwisowe po line_item_id -- pozycje systemowe BEZ campaign_id
+# (osierocone, nie ma ich w dim_campaign/dim_lineitem), wiec nie zlapie ich
+# filtr po campaign_id. Lecą permanentnie na StroerTV i psuly realizacje.
+# Flaga is_serwisowy=1 (dane zostaja, tylko oznaczone -- user filtruje w raporcie).
+SERWISOWY_LINE_ITEM_IDS = {
+    3270338,   # "TVP45s" -- 45s spot, permanentny (2025..2028), brak kampanii/statusu
+    3355830,   # "Kino Letnie (15.V-31.VIII) STV" -- permanentny, brak kampanii/statusu
+}
+
 # Kampanie recznie wymuszone na is_serwisowy=2 (single-panel/testowe), mimo ze automatyczna
 # regula get_single_panel_campaign_ids() ich nie lapie (np. brak play_logs w ogole -> 0
 # unikalnych paneli, nie dokladnie 1, wiec regula "dokladnie 1 panel" nie zadziala).
