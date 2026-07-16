@@ -43,11 +43,18 @@ GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 #   B9D=40.22 B18D=39.14 B36D=40.43 Wroclaw=38.98 (~90s petla, 40/h)
 #   StroerTV=30.09 (~120s petla)
 #   Katowice=237.9 -- probka za mala (3162 aktywnych-h), zostaw default 20
+#
+# Rekalibracja 2026-07-16: sprawdzone TYLKO na kampaniach status_name="ended"
+# (bez szumu z kampanii w trakcie). Wiekszosc formatow stabilna (Billboard/
+# DMB/Triplay/Wroclaw +-1-2), ale LiveLine mial realny dryf: 18.94 (cala baza)
+# vs 14.90 (tylko ended) -- kampanie w trakcie maja wyzsza gestosc niz
+# zakonczone. Poprawione na 15 (z ended). Katowice pominiete (chaos, za mala
+# probka niezaleznie od filtra -- 556 aktywnych-h na ended).
 DEFAULT_SLOT_DURATION = 15  # fallback gdy brak slot_duration na linii
 DEFAULT_EMISJE_PER_HOUR = 20
 
 EXPECTED_EMISJE_PER_HOUR_BY_SUBFORMAT = {
-    "DMB": 20, "LiveLine": 20, "Triplay": 20, "Kraków": 20,
+    "DMB": 20, "LiveLine": 15, "Triplay": 20, "Kraków": 20,
     "B9D": 40, "B18D": 40, "B36D": 40, "Wrocław": 40,
     "StroerTV": 30,
 }
