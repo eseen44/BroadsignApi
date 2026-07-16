@@ -66,6 +66,14 @@ GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 DATE_MIN = pd.Timestamp("2025-01-01")
 DATE_MAX = pd.Timestamp("2027-12-31")
 
+# Realizacja CZASOWA (duration) wyprowadzona z repetycji: expected_sec =
+# expected_rep * slot_duration, actual_sec = actual_rep * slot_duration.
+# Wariant A (decyzja usera 2026-07-16): duration to emisje wyrazone w
+# sekundach na TEJ SAMEJ podstawie co "% emisji" (skorygowane expected/actual
+# z Broadsign, z korekta LL/StroerTV) -- gwarantuje spojnosc obu miar. Slot z
+# line itemu; brak slotu -> fallback 15s (jedyny wolny parametr, issue #14).
+DEFAULT_SLOT_DURATION = 15
+
 # --- Korekta LiveLine/StroerTV -----------------------------------------
 # actual_skorygowany = actual_direct_api * ACT_CORRECTION[format]
 # Kalibracja: agregat sieciowy (wszystkie kampanie razem) na jedynym oknie
@@ -162,7 +170,9 @@ def build_fact_budget():
         "campaign_id", "line_item_id", "reservation_id", "line_item_name",
         "line_price", "line_start", "line_end", "line_days",
         "screen_count", "perf_expected_repetitions", "perf_actual_repetitions",
+        "slot_duration",
     ])
+    dli["slot_duration"] = pd.to_numeric(dli["slot_duration"], errors="coerce")
     dli["line_item_id"]   = pd.to_numeric(dli["line_item_id"],   errors="coerce").astype("Int64")
     dli["campaign_id"]    = pd.to_numeric(dli["campaign_id"],    errors="coerce").astype("Int64")
     dli["reservation_id"] = pd.to_numeric(dli["reservation_id"], errors="coerce").astype("Int64")
@@ -217,6 +227,7 @@ def build_fact_budget():
         line_price    = float(r["line_price"])                    if pd.notna(r["line_price"])                    else 0.0
         exp_imp       = float(r["perf_expected_repetitions"])    if pd.notna(r["perf_expected_repetitions"])    else 0.0
         act_imp       = float(r["perf_actual_repetitions"])      if pd.notna(r["perf_actual_repetitions"])      else 0.0
+        slot_dur      = float(r["slot_duration"])                 if pd.notna(r["slot_duration"])                else float(DEFAULT_SLOT_DURATION)
         name_fmt      = _name_fallback_format(_name_tokens(r["line_item_name"]))
 
         # Daty — przycięte do zakresu dim_date
@@ -282,6 +293,8 @@ def build_fact_budget():
                     "daily_cost_line":               round(daily_cost, 4),
                     "daily_expected_repetitions":    round(exp_by_pid[pid], 2),
                     "daily_actual_repetitions":      round(act_by_pid[pid], 2),
+                    "duration_expected_sec":         round(exp_by_pid[pid] * slot_dur, 2),
+                    "duration_actual_sec":           round(act_by_pid[pid] * slot_dur, 2),
                     "n_days":                        n_days,
                     "n_players":                     n_players,
                 })
@@ -296,7 +309,8 @@ def build_fact_budget():
                 "n_days", "n_players"]:
         fact[col] = pd.to_numeric(fact[col], errors="coerce").astype("Int64")
 
-    for col in ["daily_cost_line", "daily_expected_repetitions", "daily_actual_repetitions"]:
+    for col in ["daily_cost_line", "daily_expected_repetitions", "daily_actual_repetitions",
+                "duration_expected_sec", "duration_actual_sec"]:
         fact[col] = fact[col].astype("float64")
 
     total       = len(fact)
