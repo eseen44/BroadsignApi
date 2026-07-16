@@ -34,15 +34,23 @@ from Pipeline.gold.utils import save_gold
 
 GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
-# Parametry pętli (zwalidowane na CN Kopernik 2026-07-15). Pojedyncza pętla trwa
-# 180s; standardowo 1 slot kampanii na pętlę (saturation=1). Stad 3600/180=20
-# oczekiwanych emisji na godzine na playera. Do ewentualnej rekalibracji per
-# format, gdyby okazalo sie ze petla != 180 dla ktoregos nosnika.
-LOOP_DURATION_SEC = 180
-SLOTS_PER_LOOP = 1
+# Oczekiwane emisje/godzine aktywna -- SKALIBROWANE per SubFormat na realnych
+# danych (2026-07-15, is_serwisowy=0): rzeczywista petla rozni sie miedzy
+# nosnikami (billboardy/Wroclaw maja ~90s petle = 2x wiecej emisji/h niz metro
+# DMB/LiveLine/Triplay ktore maja ~180s). Zmierzone: sum_emisje/sum_active_hours
+# per SubFormat na calej bazie fact_play_logs (is_serwisowy=0):
+#   DMB=20.25 LiveLine=18.94 Triplay=19.31 Krakow=24.11 (~180s petla, 20/h)
+#   B9D=40.22 B18D=39.14 B36D=40.43 Wroclaw=38.98 (~90s petla, 40/h)
+#   StroerTV=30.09 (~120s petla)
+#   Katowice=237.9 -- probka za mala (3162 aktywnych-h), zostaw default 20
 DEFAULT_SLOT_DURATION = 15  # fallback gdy brak slot_duration na linii
+DEFAULT_EMISJE_PER_HOUR = 20
 
-EXPECTED_EMISJE_PER_HOUR = (3600 / LOOP_DURATION_SEC) * SLOTS_PER_LOOP  # = 20
+EXPECTED_EMISJE_PER_HOUR_BY_SUBFORMAT = {
+    "DMB": 20, "LiveLine": 20, "Triplay": 20, "Kraków": 20,
+    "B9D": 40, "B18D": 40, "B36D": 40, "Wrocław": 40,
+    "StroerTV": 30,
+}
 
 
 def build_fact_fill():
@@ -79,9 +87,36 @@ def build_fact_fill():
     fact = fact.merge(dli, on="line_item_id", how="left")
     fact["slot_duration"] = fact["slot_duration"].fillna(DEFAULT_SLOT_DURATION)
 
+    # SubFormat per player (replikuje kolumne DAX dim_player[SubFormat] z player_name,
+    # tylko do wyboru wspolczynnika emisje/h -- nie zapisujemy tej kolumny do gold).
+    dp = pd.read_parquet(GOLD_DIR / "dim_player.parquet", columns=["play_log_player_id", "player_name"])
+    dp["play_log_player_id"] = pd.to_numeric(dp["play_log_player_id"], errors="coerce").astype("Int64")
+
+    def _subformat(name):
+        if not isinstance(name, str):
+            return None
+        n = name.lower()
+        if "stroertv" in n: return "StroerTV"
+        if "liveline" in n: return "LiveLine"
+        if "b9d" in n: return "B9D"
+        if "b18d" in n: return "B18D"
+        if "b36d" in n: return "B36D"
+        if "wroc" in n: return "Wrocław"
+        if "krak" in n: return "Kraków"
+        if "katowice" in n: return "Katowice"
+        if "dmb" in n: return "DMB"
+        return None
+
+    dp["subfmt"] = dp["player_name"].apply(_subformat)
+    fact["play_log_player_id"] = pd.to_numeric(fact["play_log_player_id"], errors="coerce").astype("Int64")
+    fact = fact.merge(dp[["play_log_player_id", "subfmt"]], on="play_log_player_id", how="left")
+    fact["emisje_per_hour"] = fact["subfmt"].map(EXPECTED_EMISJE_PER_HOUR_BY_SUBFORMAT).fillna(DEFAULT_EMISJE_PER_HOUR)
+    fact = fact.drop(columns=["subfmt"])
+
     # Oczekiwane
-    fact["emisje_expected"] = (fact["active_hours"] * EXPECTED_EMISJE_PER_HOUR).round(2)
+    fact["emisje_expected"] = (fact["active_hours"] * fact["emisje_per_hour"]).round(2)
     fact["duration_expected_sec"] = (fact["emisje_expected"] * fact["slot_duration"]).round(2)
+    fact = fact.drop(columns=["emisje_per_hour"])
 
     # Typy
     for col in ["emisje_actual", "duration_actual_sec", "active_hours", "is_serwisowy"]:
