@@ -37,6 +37,16 @@ SERWISOWY_CAMPAIGN_IDS = {
     3005804,   # Gromada
     2464079,   # Miasto30
     3043940,   # Parking przy lotnisku
+    3706832,   # Promo TP (advertiser/client=Stroer_TP, 0 zl -- analog Stroer Promo TP)
+    3706837,   # DMB_Promo (advertiser/client=Stroer_DMB, 0 zl -- analog Stroer Promo DMB)
+    2986317,   # roadside promo niezainstalowane (brak advertisera, 0 zl)
+    3105116,   # Promo Road Mroz (advertiser/client=Stroer, 104 287 zl)
+    3071680,   # Promo_Stroer_Sw_Road (advertiser/client=Stroer, 304 730 zl)
+    3609971,   # Citylight Digital Promo (advertiser/client=Stroer, 1 358 390 zl)
+    3071824,   # Programatic_Promo (advertiser=Stroer, 1 660 435 zl)
+    # ^ wszystkie 7 znalezione regexem "promo" + advertiser/client=Stroer,
+    # potwierdzone przez usera 2026-07-16 (autopromo/wewnetrzne, nie realny
+    # przychod od klienta mimo niezerowych cen)
 }
 
 # Rezerwacje serwisowe po reservation_id
