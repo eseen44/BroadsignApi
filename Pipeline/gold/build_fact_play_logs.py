@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
-from Pipeline.gold.utils import read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS, EXCLUDED_RESERVATION_IDS, SERWISOWY_CAMPAIGN_IDS, SERWISOWY_RESERVATION_IDS, SERWISOWY_LINE_ITEM_IDS, get_single_panel_campaign_ids, FORCE_SINGLE_PANEL_CAMPAIGN_IDS
+from Pipeline.gold.utils import read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS, EXCLUDED_RESERVATION_IDS, SERWISOWY_CAMPAIGN_IDS, SERWISOWY_RESERVATION_IDS, SERWISOWY_LINE_ITEM_IDS, get_single_panel_campaign_ids, FORCE_SINGLE_PANEL_CAMPAIGN_IDS, MANUAL_RESERVATION_OVERRIDES
 
 GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
@@ -85,6 +85,15 @@ def build_fact_play_logs():
     res_camp = res_camp.drop_duplicates(subset=["reservation_id"])
 
     df = df.merge(res_camp, on="reservation_id", how="left")
+
+    # Reczne nadpisanie dla rezerwacji calkowicie bez bookingu w Broadsign (brak
+    # proposal_id/contract_id/line_item_id juz w zrodle -- patrz utils.py). Uzupelnia
+    # syntetyczny campaign_id/line_item_id zeby dim_campaign/dim_line_item mialy dla
+    # nich resolvowalna nazwe zamiast pustego campaign_name.
+    for res_id, ov in MANUAL_RESERVATION_OVERRIDES.items():
+        mask = (df["reservation_id"] == res_id) & df["campaign_id"].isna()
+        df.loc[mask, "campaign_id"]  = ov["campaign_id"]
+        df.loc[mask, "line_item_id"] = ov["line_item_id"]
 
     # NULL campaign_id = brak mapowania w v22 (stare kampanie, direct scheduling)
     # Zostawiamy — dostaną is_serwisowy na podstawie reservation_id lub 0 (komercyjne)

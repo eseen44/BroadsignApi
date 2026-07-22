@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import pandas as pd
-from Pipeline.gold.utils import read_bronze, read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS
+from Pipeline.gold.utils import read_bronze, read_silver, save_gold, EXCLUDED_CAMPAIGN_IDS, MANUAL_RESERVATION_OVERRIDES
 
 LI_COLS = [
     "line_item_id", "campaign_id",
@@ -93,6 +93,23 @@ def build_dim_line_item():
         on="line_item_id",
         how="left",
     )
+
+    # ------------------------------------------------------------------
+    # 3b. Doloz syntetyczne line itemy dla rezerwacji bez zadnego bookingu w
+    # Broadsign (brak line_item_id w zrodle) -- patrz MANUAL_RESERVATION_OVERRIDES
+    # w utils.py. reservation_id ustawiony recznie (bo merge powyzej go nie znajdzie).
+    # ------------------------------------------------------------------
+    synthetic = [
+        {
+            "line_item_id":   ov["line_item_id"],
+            "campaign_id":    ov["campaign_id"],
+            "line_item_name": ov["line_item_name"],
+            "reservation_id": res_id,
+        }
+        for res_id, ov in MANUAL_RESERVATION_OVERRIDES.items()
+    ]
+    if synthetic:
+        df = pd.concat([df, pd.DataFrame(synthetic)], ignore_index=True)
 
     # ------------------------------------------------------------------
     # 4. Typy i formatowanie

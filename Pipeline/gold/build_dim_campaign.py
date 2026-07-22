@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import pandas as pd
 from Pipeline.gold.utils import (
     read_silver, save_gold, SERWISOWY_CAMPAIGN_IDS, get_single_panel_campaign_ids,
-    EXCLUDED_CAMPAIGN_IDS, FORCE_SINGLE_PANEL_CAMPAIGN_IDS,
+    EXCLUDED_CAMPAIGN_IDS, FORCE_SINGLE_PANEL_CAMPAIGN_IDS, MANUAL_RESERVATION_OVERRIDES,
 )
 
 CAMP_COLS = [
@@ -38,6 +38,21 @@ def build_dim_campaign():
 
     # Kampanie twardo wykluczone (stare/nieaktualne dane) — patrz utils.py
     df = df[~df["campaign_id"].isin(EXCLUDED_CAMPAIGN_IDS)]
+
+    # Doloz syntetyczne "kampanie" dla rezerwacji bez zadnego bookingu w Broadsign
+    # (brak proposal_id w zrodle) -- patrz MANUAL_RESERVATION_OVERRIDES w utils.py.
+    synthetic = [
+        {
+            "campaign_id":  ov["campaign_id"],
+            "campaign_name": ov["campaign_name"],
+            "advertiser":    ov.get("advertiser"),
+            "client_name":   ov.get("client_name"),
+        }
+        for ov in MANUAL_RESERVATION_OVERRIDES.values()
+    ]
+    if synthetic:
+        df = pd.concat([df, pd.DataFrame(synthetic)], ignore_index=True)
+        df["campaign_id"] = pd.to_numeric(df["campaign_id"], errors="coerce").astype("Int64")
 
     # Flaga is_serwisowy: 1=autopromocja/serwisowe, 2=single-panel (test/diagnostyczne)
     single_panel = get_single_panel_campaign_ids() | FORCE_SINGLE_PANEL_CAMPAIGN_IDS

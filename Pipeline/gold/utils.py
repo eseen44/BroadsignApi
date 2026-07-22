@@ -47,6 +47,29 @@ SERWISOWY_CAMPAIGN_IDS = {
     # ^ wszystkie 7 znalezione regexem "promo" + advertiser/client=Stroer,
     # potwierdzone przez usera 2026-07-16 (autopromo/wewnetrzne, nie realny
     # przychod od klienta mimo niezerowych cen)
+    900000001,  # syntetyczny -- "Uwaga Pociąg", patrz MANUAL_RESERVATION_OVERRIDES
+}
+
+# Rezerwacje calkowicie bez bookingu w Broadsign (brak proposal_id/contract_id/
+# line_item_id JUZ W ZRODLE Control API, nie tylko w naszym fetchu -- potwierdzone
+# 2026-07-22, patrz CLAUDE.md). Nie da sie ich dociagnac przez API, bo nie ma czego
+# szukac. Recznie nadajemy syntetyczny campaign_id/line_item_id (pula 900000000+,
+# poza zakresem prawdziwych ID Broadsign) zeby mialy resolvowalna nazwe w raportach
+# zamiast pustego campaign_name. Wpiete w build_fact_play_logs.py (uzupelnia
+# campaign_id/line_item_id po res_camp merge) + build_dim_campaign.py/
+# build_dim_line_item.py (dokladaja syntetyczny wiersz z ta nazwa).
+MANUAL_RESERVATION_OVERRIDES = {
+    1125116202: {
+        # TrainArrivingMessage -- czujka na stacji wykrywa nadjezdzajacy pociag i
+        # przerywa standardowa petle komunikatem ostrzegawczym. Czas kontraktowo
+        # nalezy do Metra Warszawskiego (nie do normalnego inventory reklamowego).
+        "campaign_id": 900000001,
+        "line_item_id": 900000001,
+        "campaign_name": "Uwaga Pociąg",
+        "line_item_name": "Uwaga Pociąg",
+        "advertiser": "Metro Warszawskie",
+        "client_name": "Metro Warszawskie",
+    },
 }
 
 # Rezerwacje serwisowe po reservation_id
