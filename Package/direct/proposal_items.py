@@ -16,8 +16,8 @@ def get_proposal_item_summary(session, item_id):
     return resp.json()
 
 
-def search_proposal_items(session, skip=0, top=PAGE_SIZE, filters=None):
-    body = {"$skip": skip, "$top": top}
+def search_proposal_items(session, skip=0, top=PAGE_SIZE, sort_field="id", sort_dir="desc", filters=None):
+    body = {"$skip": skip, "$top": top, "$sort": [{"field": sort_field, "dir": sort_dir}]}
     if filters:
         body.update(filters)
     resp = session.post(f"{BASE_URL}/proposal_item/search", json=body)

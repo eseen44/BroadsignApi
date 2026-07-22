@@ -24,6 +24,7 @@ from Package.popstats.client import get_session as get_popstats_session
 from Pipeline.bronze.fetch_direct import (
     fetch_proposals,
     fetch_proposal_items,
+    reconcile_missing_proposal_items,
     fetch_screens,
     fetch_screens_frames_mapping,
     fetch_fill_rate,
@@ -55,6 +56,7 @@ def run():
     simple_steps = [
         ("proposals",              fetch_proposals),
         ("proposal_items",         fetch_proposal_items),
+        ("reconcile_proposal_items", reconcile_missing_proposal_items),
         ("screens",                fetch_screens),
         ("screens_frames_mapping", fetch_screens_frames_mapping),
         ("users",                  fetch_users),

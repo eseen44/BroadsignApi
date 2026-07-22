@@ -17,11 +17,13 @@ import pandas as pd
 from datetime import date, timedelta
 
 from Package.auth import get_session
-from Package.direct.proposals import get_all_proposals
-from Package.direct.proposal_items import get_all_proposal_items
+from Package.direct.proposals import get_all_proposals, get_proposal
+from Package.direct.proposal_items import get_all_proposal_items, get_proposal_item
 from Package.direct.inventory import get_all_screens, get_screens_frames_mapping
 from Package.direct.reporting import get_all_fill_rate
-from Pipeline.bronze.utils import save_parquet, upsert_parquet
+from Pipeline.bronze.utils import BRONZE_DIR, save_parquet, upsert_parquet
+
+GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
 FILL_RATE_DAYS = 28  # ile dni wstecz dla fill_rate — API max: 1 miesiąc
 
@@ -38,6 +40,69 @@ def fetch_proposal_items(session):
     records = get_all_proposal_items(session)
     df = pd.DataFrame(records)
     return upsert_parquet(df, "proposal_items", key_col="id")
+
+
+def reconcile_missing_proposal_items(session):
+    """
+    Self-healing: fact_play_logs (gold, z poprzedniego przebiegu) moze
+    referencjonowac line_item_id ktorych search_proposal_items() nie zwrocil
+    (niedeterministyczna paginacja / niszowe statusy niedostepne przez search
+    -- zobacz c5c1b6f i incydent 2026-07-22). GET-by-ID dziala nawet gdy dany
+    item jest niewidoczny dla search, wiec dociagamy braki pojedynczo i
+    upsertujemy do bronze -- kolejny przebieg silver/gold w TYM SAMYM cyklu
+    pipeline'u je juz zobaczy.
+    """
+    print("Rekoncyliacja: sieroty line_item_id w fact_play_logs...")
+    gold_path = GOLD_DIR / "fact_play_logs.parquet"
+    if not gold_path.exists():
+        print("  fact_play_logs.parquet jeszcze nie istnieje -- pomijam (pierwszy run).")
+        return
+
+    liids = pd.read_parquet(gold_path, columns=["line_item_id"])["line_item_id"]
+    liids = pd.to_numeric(liids, errors="coerce").dropna().astype("int64").unique()
+
+    items_path = BRONZE_DIR / "proposal_items.parquet"
+    known_ids = set(pd.read_parquet(items_path, columns=["id"])["id"].astype("int64")) if items_path.exists() else set()
+
+    missing = sorted(set(int(x) for x in liids) - known_ids)
+    if not missing:
+        print("  Brak sierot. OK.")
+        return
+
+    print(f"  Znaleziono {len(missing)} sierot: {missing}")
+    recovered_items, still_missing = [], []
+    for iid in missing:
+        try:
+            recovered_items.append(get_proposal_item(session, iid))
+        except Exception as e:
+            still_missing.append(iid)
+            print(f"    line_item_id={iid}: NIE odzyskano ({e})")
+
+    if not recovered_items:
+        print("  Nic nie odzyskano przez GET-by-ID.")
+        return
+
+    df_items = pd.DataFrame(recovered_items)
+    upsert_parquet(df_items, "proposal_items", key_col="id")
+
+    # Dociagnij tez brakujace proposals (kampanie) dla odzyskanych itemow
+    proposals_path = BRONZE_DIR / "proposals.parquet"
+    known_proposal_ids = set(pd.read_parquet(proposals_path, columns=["id"])["id"].astype("int64")) if proposals_path.exists() else set()
+    needed_proposal_ids = set(int(x) for x in df_items["proposal_id"].dropna().unique()) - known_proposal_ids
+
+    if needed_proposal_ids:
+        print(f"  Dociagam {len(needed_proposal_ids)} brakujacych proposals: {sorted(needed_proposal_ids)}")
+        recovered_proposals = []
+        for pid in needed_proposal_ids:
+            try:
+                recovered_proposals.append(get_proposal(session, pid))
+            except Exception as e:
+                print(f"    proposal_id={pid}: NIE odzyskano ({e})")
+        if recovered_proposals:
+            upsert_parquet(pd.DataFrame(recovered_proposals), "proposals", key_col="id")
+
+    if still_missing:
+        print(f"  UWAGA: {len(still_missing)} line_item_id NIE do odzyskania (prawdopodobnie faktycznie usuniete z Broadsign): {still_missing}")
 
 
 def fetch_screens(session):
@@ -109,6 +174,7 @@ if __name__ == "__main__":
     session = get_session()
     fetch_proposals(session)
     fetch_proposal_items(session)
+    reconcile_missing_proposal_items(session)
     fetch_screens(session)
     fetch_screens_frames_mapping(session)
     fetch_fill_rate(session)
