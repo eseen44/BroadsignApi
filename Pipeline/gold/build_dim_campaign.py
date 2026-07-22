@@ -41,15 +41,17 @@ def build_dim_campaign():
 
     # Doloz syntetyczne "kampanie" dla rezerwacji bez zadnego bookingu w Broadsign
     # (brak proposal_id w zrodle) -- patrz MANUAL_RESERVATION_OVERRIDES w utils.py.
-    synthetic = [
-        {
+    # Wiele rezerwacji dzieli ten sam synthetic campaign_id (np. "Autopromocja") --
+    # dedup po campaign_id, zeby dim_campaign nie dostal duplikatu klucza.
+    synthetic = list({
+        ov["campaign_id"]: {
             "campaign_id":  ov["campaign_id"],
             "campaign_name": ov["campaign_name"],
             "advertiser":    ov.get("advertiser"),
             "client_name":   ov.get("client_name"),
         }
         for ov in MANUAL_RESERVATION_OVERRIDES.values()
-    ]
+    }.values())
     if synthetic:
         df = pd.concat([df, pd.DataFrame(synthetic)], ignore_index=True)
         df["campaign_id"] = pd.to_numeric(df["campaign_id"], errors="coerce").astype("Int64")

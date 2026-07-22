@@ -48,6 +48,7 @@ SERWISOWY_CAMPAIGN_IDS = {
     # potwierdzone przez usera 2026-07-16 (autopromo/wewnetrzne, nie realny
     # przychod od klienta mimo niezerowych cen)
     900000001,  # syntetyczny -- "Uwaga Pociąg", patrz MANUAL_RESERVATION_OVERRIDES
+    900000002,  # syntetyczny -- "Autopromocja" (19 rezerwacji bez bookingu), patrz nizej
 }
 
 # Rezerwacje calkowicie bez bookingu w Broadsign (brak proposal_id/contract_id/
@@ -70,6 +71,30 @@ MANUAL_RESERVATION_OVERRIDES = {
         "advertiser": "Metro Warszawskie",
         "client_name": "Metro Warszawskie",
     },
+    # Pozostale 19 rezerwacji bez bookingu -- opisane w CLAUDE.md (2026-07-22),
+    # wszystkie oznaczone recznie jako Autopromocja/Stroer (decyzja usera, nie
+    # automatyczna regula -- tylko te konkretne reservation_id, nic wiecej).
+    # Wspolny campaign_id (jedna "kampania" Autopromocja), unikalny line_item_id
+    # per rezerwacja (zeby dim_line_item nie dostal duplikatu klucza).
+    1230744166: {"campaign_id": 900000002, "line_item_id": 900000003, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1248739280: {"campaign_id": 900000002, "line_item_id": 900000004, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1248760574: {"campaign_id": 900000002, "line_item_id": 900000005, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1249965482: {"campaign_id": 900000002, "line_item_id": 900000006, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1249965517: {"campaign_id": 900000002, "line_item_id": 900000007, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1249965703: {"campaign_id": 900000002, "line_item_id": 900000008, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1320926616: {"campaign_id": 900000002, "line_item_id": 900000009, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1173115467: {"campaign_id": 900000002, "line_item_id": 900000010, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1173115610: {"campaign_id": 900000002, "line_item_id": 900000011, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1287527034: {"campaign_id": 900000002, "line_item_id": 900000012, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1422515259: {"campaign_id": 900000002, "line_item_id": 900000013, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1424533850: {"campaign_id": 900000002, "line_item_id": 900000014, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1444673694: {"campaign_id": 900000002, "line_item_id": 900000015, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1967182419: {"campaign_id": 900000002, "line_item_id": 900000016, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1967518300: {"campaign_id": 900000002, "line_item_id": 900000017, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1987096469: {"campaign_id": 900000002, "line_item_id": 900000018, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1989331182: {"campaign_id": 900000002, "line_item_id": 900000019, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1989334266: {"campaign_id": 900000002, "line_item_id": 900000020, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
+    1991227199: {"campaign_id": 900000002, "line_item_id": 900000021, "campaign_name": "Autopromocja", "line_item_name": "Autopromocja", "advertiser": "Stroer", "client_name": "Stroer"},
 }
 
 # Rezerwacje serwisowe po reservation_id
