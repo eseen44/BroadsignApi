@@ -49,6 +49,15 @@ SERWISOWY_CAMPAIGN_IDS = {
     # przychod od klienta mimo niezerowych cen)
     900000001,  # syntetyczny -- "Uwaga Pociąg", patrz MANUAL_RESERVATION_OVERRIDES
     900000002,  # syntetyczny -- "Autopromocja" (19 rezerwacji bez bookingu), patrz nizej
+    # Programmatic "always-on" kontenery: cena 0, przychod 0, sentinelowa data konca
+    # (2099/2078) -- puste kanaly programmatic, nie realne kampanie. Psuly statystyki
+    # (czas trwania: 26 844 dni). Zero przychodu do ukrycia. User 2026-07-23.
+    # (Programatic_Promo 3071824 z realnym 1,66 mln JUZ wyzej -- autopromo.)
+    3705906,   # Programmatic_DMB_Metro_Warsaw (end 2099-12-31)
+    3705905,   # Programmatic_TriPlay_Metro_Warszawa (end 2099-12-31)
+    3705898,   # Programmatic_TriPlay_Metro_Warszawa (end 2099-12-31)
+    3029333,   # Programmatic Roadside 12/12 (end 2078-12-31)
+    3002440,   # Programmatic Reach Campaign 12/12 (end 2028-08-21)
 }
 
 # Rezerwacje calkowicie bez bookingu w Broadsign (brak proposal_id/contract_id/
