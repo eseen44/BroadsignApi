@@ -79,6 +79,7 @@ def scan_tarball(tarball: Path) -> pd.DataFrame:
     rozstrzygamy po dacie z nazwy pliku, nie po kolejnosci odczytu.
     """
     best: dict[int, tuple[str, str, str, str]] = {}   # id -> (file_date, name, type, source_file)
+    all_dates: set[str] = set()
     n_files = 0
 
     with tarfile.open(tarball, "r|gz") as tar:
@@ -90,6 +91,7 @@ def scan_tarball(tarball: Path) -> pd.DataFrame:
             if not match:
                 continue
             file_date = match.group(1)
+            all_dates.add(file_date)
 
             fh = tar.extractfile(m)
             if fh is None:
@@ -107,6 +109,9 @@ def scan_tarball(tarball: Path) -> pd.DataFrame:
                     best[rid] = (file_date, row["name"], row["type"], fname)
 
     print(f"  Przeskanowano {n_files} plikow, {len(best)} unikalnych id")
+    if all_dates:
+        d = sorted(all_dates)
+        print(f"  Zakres dat w archiwum: {d[0]} -> {d[-1]}")
     if not best:
         return pd.DataFrame(columns=["id", "name", "type", "source_file"])
 
@@ -114,8 +119,8 @@ def scan_tarball(tarball: Path) -> pd.DataFrame:
         [{"id": rid, "name": v[1], "type": v[2], "source_file": v[3]}
          for rid, v in best.items()]
     )
-    dates = sorted({v[0] for v in best.values()})
-    print(f"  Zakres dat plikow: {dates[0]} -> {dates[-1]}")
+    win = sorted({v[0] for v in best.values()})
+    print(f"  Nazwy pochodza z plikow z zakresu: {win[0]} -> {win[-1]}")
     return df
 
 
