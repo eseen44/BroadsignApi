@@ -169,6 +169,16 @@ def main(tarball: str = DEFAULT_TARBALL, dry_run: bool = False) -> int:
         return 0
 
     new["_fetched_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    # Wyrownaj typy do istniejacego parquetu. `id` w bronze jest trzymane jako
+    # string (fetch popstats parsuje TSV bez rzutowania), a my mamy inty ze
+    # scanu -> concat dalby kolumne object z mieszanka int/str i pyarrow
+    # wywalilby sie na zapisie ("Expected bytes, got a 'int' object").
+    # Ten sam problem obchodzi upsert_parquet w bronze/utils.py.
+    for col in new.columns:
+        if col in existing.columns and existing[col].dtype == object:
+            new[col] = new[col].astype(str)
+
     merged = pd.concat([existing, new], ignore_index=True)
 
     # Sanity: add-only nie moze niczego zgubic ani zduplikowac klucza.
