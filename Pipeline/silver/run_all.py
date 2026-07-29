@@ -44,8 +44,11 @@ STEPS = [
 ]
 
 # Kroki, których FAIL nie blokuje Gold (nie ma jeszcze na nich zależnych
-# tabel Gold). magicinfo_pop wymaga Bronze fetch, który obecnie nie jest
-# uruchamiany na VM — dopóki to się nie zmieni, jego FAIL jest oczekiwany.
+# tabel Gold). magicinfo_pop jest non-critical WYŁĄCZNIE dlatego, że żadna
+# tabela Gold go jeszcze nie konsumuje — nie dlatego, że jest zepsuty:
+# Bronze fetch magicinfo działa w codziennym cronie na VM i ten krok przechodzi
+# na OK (zweryfikowane 2026-07-29). Gdy dojdzie warstwa Gold dla MagicInfo,
+# zdjąć go z tego zbioru.
 NON_CRITICAL = {"magicinfo_pop"}
 
 

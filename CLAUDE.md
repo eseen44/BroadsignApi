@@ -17,7 +17,7 @@ cd C:\Projects\BroadsignApi
 "C:\ProgramData\Anaconda3\python.exe" run_pipeline.py       # pełny pipeline lokalnie
 ```
 Na VM produkcyjnie: `/dane/BroadsignApi/run_pipeline.sh` (cron `30 9 * * *`), Bronze→Silver→Gold→sync. Log: `/dane/BroadsignApi/pipeline.log`.
-**Uwaga:** `run_pipeline.py` leci przez wszystkie warstwy niezależnie od FAIL wcześniejszej (agreguje tylko boolean na końcu) — może cicho wypchnąć niekompletne dane. Do świadomości przy debugowaniu.
+**Fail-fast — NAPRAWIONE 2026-07-29, wcześniejszy opis wyolbrzymiał ryzyko.** `run_pipeline.py` leciał przez wszystkie warstwy niezależnie od FAIL wcześniejszej; teraz FAIL krytycznego kroku przerywa pipeline i pozostałe warstwy raportują `POMINIETE`. **Produkcja nigdy nie była na to narażona** — cron woła `run_pipeline.sh`, który ma `set -e` + `|| exit 1` po każdej warstwie, a każdy `run_all.py` robi `sys.exit(1)` przy krytycznym FAIL. Realna ekspozycja dotyczyła tylko ręcznego `python3 run_pipeline.py` na VM: silver/gold liczyły się ze starego bronze'a, a `gold/run_all.py` (który pilnuje tylko własnych kroków) kopiował wynik do `UbuntuSynch` → cron `*/15` wypychał na SharePoint. Warstwy zwracają False tylko dla kroków KRYTYCZNYCH — `NON_CRITICAL` (np. `magicinfo_pop`) nie zatrzymuje pipeline'u.
 
 ## 🔁 Workflow wdrożenia zmiany w Gold (KLUCZOWE — powtarza się co chwilę)
 Zmiana w `Pipeline/gold/*` → do PBI:
