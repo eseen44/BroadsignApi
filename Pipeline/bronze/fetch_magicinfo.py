@@ -200,11 +200,22 @@ def main(force: bool = False) -> None:
             print(f"  BLAD: {e}")
             return
 
-        to_fetch = [m for m in available if m not in fetched or force]
+        # Biezacy miesiac ZAWSZE re-fetchujemy, nawet gdy jest juz w kursorze.
+        # Inaczej miesiac pobrany w swojej POLOWIE zostaje na zawsze "zaliczony"
+        # i kolejne dni nigdy nie doleca -- bronze zamarza (incydent: kursor
+        # dostal 2026-07 w dniu 13.07, dane stanely na 2026-07-12 na 2+ tygodnie,
+        # a cron caly czas raportowal OK). Bezpieczne, bo _upsert_month robi
+        # upsert po kluczu (format, content_id, play_date) -- kurczace sie okno
+        # API nie kasuje juz zapisanych dni.
+        current_month = datetime.now().strftime("%Y-%m")
+        to_fetch = [
+            m for m in available
+            if m not in fetched or m == current_month or force
+        ]
         if not to_fetch:
             print("  Wszystkie miesiace pobrane. Uzyj --force zeby odswiezic.")
             return
-        print(f"  Do pobrania: {to_fetch}")
+        print(f"  Do pobrania: {to_fetch}  (biezacy: {current_month})")
 
         print("\n[2] Metadane contentow z CMS...")
         content_meta = fetch_content_meta(mi)
