@@ -36,7 +36,7 @@ from Pipeline.bronze.fetch_magicinfo import main as fetch_magicinfo
 
 # Kroki, ktorych FAIL nie blokuje reszty pipeline'u (Silver/Gold nie zaleza
 # jeszcze od ich wyniku).
-NON_CRITICAL = {"magicinfo_pop"}
+NON_CRITICAL = {"magicinfo_pop", "bronze_backup_s3"}
 
 
 def run():
@@ -144,6 +144,26 @@ def run():
     except Exception as e:
         print(f"  BLAD: {e}")
         results["magicinfo_pop"] = f"FAIL: {e}"
+
+    # ------------------------------------------------------------------
+    # 5. Backup bronze na S3 -- niekrytyczne. Bronze zawiera dane, ktorych
+    #    NIE DA SIE odtworzyc (popstats rolling ~2mc, MagicInfo ~31 dni),
+    #    a /dane na VM nie jest przez nic innego backupowane. Non-critical,
+    #    zeby chwilowa awaria S3 (VPN, throttling) nie wywalala pipeline'u,
+    #    ktory bronze policzyl poprawnie.
+    # ------------------------------------------------------------------
+    print("\n[bronze_backup_s3]")
+    try:
+        from Pipeline.bronze.backup_to_s3 import backup
+        wyniki = backup()
+        zle = [k for k, v in wyniki.items() if not v.startswith("OK")]
+        if zle:
+            results["bronze_backup_s3"] = f"FAIL: {zle}"
+        else:
+            results["bronze_backup_s3"] = f"OK ({len(wyniki)} plikow)"
+    except Exception as e:
+        print(f"  BLAD: {e}")
+        results["bronze_backup_s3"] = f"FAIL: {e}"
 
     # ------------------------------------------------------------------
     # Podsumowanie
