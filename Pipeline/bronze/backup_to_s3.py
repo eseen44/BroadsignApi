@@ -107,9 +107,8 @@ def main() -> bool:
                     help="nadpisz nawet gdy plik istotnie sie skurczyl")
     args = ap.parse_args()
 
-    if not all([os.getenv("AWS_REGION"), os.getenv("AWS_ACCESS_KEY_ID"),
-                os.getenv("AWS_SECRET_ACCESS_KEY"), S3_BUCKET]):
-        print("BLAD: brak konfiguracji AWS w .env")
+    if not S3_BUCKET:
+        print("BLAD: brak S3_DATA_BUCKET w .env")
         return False
 
     wyniki = backup(args.dry_run, args.snapshot, args.force)

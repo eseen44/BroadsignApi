@@ -36,17 +36,19 @@ PROBY = 4
 BACKOFF_S = 3        # 3s, 6s, 12s -- rosnaco
 
 
-def make_client():
-    """Klient S3 z wlasnym retry botocore + rozsadnymi timeoutami.
+def make_client(usluga: str = "s3"):
+    """Klient AWS z rozsadnymi timeoutami i retry botocore.
 
-    Ustawiamy timeouty jawnie, bo domyslne (60s connect) potrafia zawiesic
+    Poswiadczen NIE podajemy jawnie -- boto3 czyta je z ~/.aws/credentials
+    (standardowy mechanizm AWS). Dzieki temu klucz jest w JEDNYM miejscu na
+    maszynie, a nie duplikowany w .env kazdego projektu; rotacja to podmiana
+    jednego pliku. Region z ~/.aws/config.
+
+    Timeouty ustawiamy jawnie, bo domyslne (60s connect) potrafia zawiesic
     crona na dlugo, gdy VPN padnie w trakcie -- a to sie tu zdarza regularnie.
     """
     return boto3.client(
-        "s3",
-        region_name=os.getenv("AWS_REGION"),
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        usluga,
         config=Config(
             retries={"max_attempts": 3, "mode": "standard"},   # warstwa botocore
             connect_timeout=15,

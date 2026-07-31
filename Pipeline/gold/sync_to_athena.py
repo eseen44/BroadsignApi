@@ -36,9 +36,8 @@ load_dotenv()
 
 GOLD_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
 
-AWS_REGION = os.getenv("AWS_REGION")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+# Poswiadczenia AWS: ~/.aws/credentials (patrz Pipeline/s3_utils.py::make_client).
+# W .env zostaje tylko to, co specyficzne dla projektu.
 S3_BUCKET = os.getenv("S3_DATA_BUCKET")
 
 # Tabele ktore fizycznie leza w Data/gold/, ale NIE sa produktem run_all.py
@@ -109,9 +108,8 @@ def main() -> bool:
                      help="lista po przecinku (domyslnie: wszystkie ze STEPS run_all.py)")
     args = ap.parse_args()
 
-    if not all([AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET]):
-        print("BLAD: brak konfiguracji AWS w .env (AWS_REGION, AWS_ACCESS_KEY_ID, "
-              "AWS_SECRET_ACCESS_KEY, S3_DATA_BUCKET)")
+    if not S3_BUCKET:
+        print("BLAD: brak S3_DATA_BUCKET w .env")
         return False
 
     wszystkie = wszystkie_tabele()
