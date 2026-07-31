@@ -26,12 +26,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import argparse
 from datetime import datetime, timezone
 
-import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 import os
 
-from Pipeline.gold.run_all import STEPS
+from Pipeline.s3_utils import make_client, upload_retry
 
 load_dotenv()
 
@@ -48,6 +47,13 @@ S3_BUCKET = os.getenv("S3_DATA_BUCKET")
 NIGDY_NIE_WYSYLAJ = {"fact_fill", "dim_screen"}
 
 
+def wszystkie_tabele() -> list[str]:
+    """Import lokalny -- run_all.py wola sync(), wiec import na poziomie modulu
+    zrobilby cykl."""
+    from Pipeline.gold.run_all import STEPS
+    return [name for name, _ in STEPS]
+
+
 def s3_key(tabela: str) -> str:
     return f"{tabela}/data/{tabela}.parquet"
 
@@ -60,11 +66,7 @@ def sync(tabele: list[str], dry_run: bool = False) -> dict:
             f"-- usun je z listy tabel do wgrania"
         )
 
-    s3 = boto3.client(
-        "s3", region_name=AWS_REGION,
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    )
+    s3 = make_client()
 
     wyniki = {}
     print(f"\n=== Sync gold -> s3://{S3_BUCKET}/  ({'DRY RUN' if dry_run else 'na zywo'}) ===")
@@ -86,13 +88,16 @@ def sync(tabele: list[str], dry_run: bool = False) -> dict:
             continue
 
         try:
-            s3.upload_file(str(path), S3_BUCKET, key)
+            upload_retry(s3, path, S3_BUCKET, key, etykieta=tabela)
             print(f"  OK        {tabela:<24} {size_mb:8.2f} MB  -> s3://{S3_BUCKET}/{key}")
             wyniki[tabela] = f"OK ({size_mb:.2f} MB)"
         except ClientError as e:
             err = e.response["Error"]
             print(f"  BLAD      {tabela:<24} {err['Code']}: {err['Message'][:120]}")
             wyniki[tabela] = f"BLAD: {err['Code']}"
+        except Exception as e:
+            print(f"  BLAD      {tabela:<24} {type(e).__name__}: {str(e)[:120]}")
+            wyniki[tabela] = f"BLAD: {type(e).__name__}"
 
     return wyniki
 
@@ -109,7 +114,7 @@ def main() -> bool:
               "AWS_SECRET_ACCESS_KEY, S3_DATA_BUCKET)")
         return False
 
-    wszystkie = [name for name, _ in STEPS]
+    wszystkie = wszystkie_tabele()
     if args.tabele:
         tabele = [t.strip() for t in args.tabele.split(",") if t.strip()]
         nieznane = set(tabele) - set(wszystkie)

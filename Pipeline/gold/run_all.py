@@ -96,6 +96,23 @@ def run():
         print(f"\n[sync → OneDrive]")
         sync_to_onedrive(gold_dir)
 
+        # S3/Athena — NON-CRITICAL, celowo nie wplywa na kod wyjscia.
+        # Dopoki Power BI czyta z SharePointa, krytyczna sciezka to OneDrive
+        # wyzej; S3 jest dodatkiem. Gold policzyl sie poprawnie i trafil do
+        # PBI, wiec chwilowa awaria S3 (padniety VPN, throttling) nie moze
+        # wywalac calego pipeline'u. upload_retry ponawia bledy przejsciowe.
+        # PO PRZEPIECIU PBI NA ODBC: przeniesc krytycznosc tutaj.
+        print(f"\n[sync → S3/Athena]")
+        try:
+            from Pipeline.gold.sync_to_athena import sync, wszystkie_tabele
+            wyniki = sync(wszystkie_tabele())
+            zle = [t for t, w in wyniki.items() if not w.startswith("OK")]
+            if zle:
+                print(f"  UWAGA: nie wyslano na S3: {zle} (nie blokuje pipeline'u)")
+        except Exception as e:
+            print(f"  UWAGA: sync na S3 padl ({type(e).__name__}: {str(e)[:120]}) "
+                  f"-- nie blokuje pipeline'u")
+
     return len(fail) == 0
 
 
