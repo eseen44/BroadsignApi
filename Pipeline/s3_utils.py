@@ -9,6 +9,7 @@ import os
 import time
 
 import boto3
+from boto3.exceptions import S3UploadFailedError
 from botocore.config import Config
 from botocore.exceptions import (
     BotoCoreError,
@@ -16,6 +17,12 @@ from botocore.exceptions import (
     ConnectionError as BotoConnectionError,
     EndpointConnectionError,
 )
+
+# boto3 upload_file OPAKOWUJE ClientError w S3UploadFailedError (robi to
+# S3Transfer). Bez tego w liscie ponizej petla retry nigdy by sie nie
+# uruchomila dla uploadow -- zlapane testem 2026-07-31.
+BLEDY_SIECIOWE = (ClientError, S3UploadFailedError, EndpointConnectionError,
+                  BotoConnectionError, BotoCoreError)
 
 # Kody bledow, ktorych NIE ma sensu ponawiac -- to blad konfiguracji/uprawnien,
 # nie chwilowa awaria. Ponawianie ich tylko opoznia zglos<enie problemu.
@@ -49,8 +56,17 @@ def make_client():
 
 
 def _trwaly(exc) -> bool:
-    return (isinstance(exc, ClientError)
-            and exc.response["Error"]["Code"] in BLEDY_TRWALE)
+    """Czy to blad, ktorego nie ma sensu ponawiac.
+
+    S3UploadFailedError nie niesie structured error code -- oryginalny wyjatek
+    jest doklejony do tekstu. Stad dopasowanie po napisie dla tego przypadku.
+    """
+    if isinstance(exc, ClientError):
+        return exc.response["Error"]["Code"] in BLEDY_TRWALE
+    if isinstance(exc, S3UploadFailedError):
+        tekst = str(exc)
+        return any(kod in tekst for kod in BLEDY_TRWALE)
+    return False
 
 
 def _opis(exc) -> str:
@@ -72,7 +88,7 @@ def upload_retry(s3, sciezka, bucket: str, key: str, etykieta: str = "") -> None
         try:
             s3.upload_file(str(sciezka), bucket, key)
             return
-        except (ClientError, EndpointConnectionError, BotoConnectionError, BotoCoreError) as e:
+        except BLEDY_SIECIOWE as e:
             ostatni = e
             if _trwaly(e):
                 raise                       # AccessDenied itp. -- nie ma czego ponawiac
