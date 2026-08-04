@@ -17,7 +17,10 @@ Zasady (ustalone 2026-07-30, patrz CLAUDE.md / pamięć aws_athena_access):
     -- ten skrypt NIE tworzy/nie zmienia tabel, tylko wrzuca pliki pod
     sciezki ktore juz istnieja. Zmiana schematu = nowy DDL do IT
     (Pipeline/gold/gen_athena_ddl.py w repo SWAT Refactor), nie ALTER TABLE stad.
-  - Konwencja sciezki (potwierdzona przez IT): s3://<bucket>/<tabela>/data/<tabela>.parquet
+  - Konwencja sciezki (2026-08-03, folder per projekt zamiast plaskiej struktury):
+    s3://<bucket>/broadsign/gold/<tabela>/data/<tabela>.parquet
+    Poprzednia plaska konwencja (bez prefiksu) zostaje az IT przepnie LOCATION
+    w Glue na nowa sciezke -- wtedy stare obiekty na S3 zostana usuniete.
 """
 import sys
 from pathlib import Path
@@ -54,7 +57,7 @@ def wszystkie_tabele() -> list[str]:
 
 
 def s3_key(tabela: str) -> str:
-    return f"{tabela}/data/{tabela}.parquet"
+    return f"broadsign/gold/{tabela}/data/{tabela}.parquet"
 
 
 def sync(tabele: list[str], dry_run: bool = False) -> dict:

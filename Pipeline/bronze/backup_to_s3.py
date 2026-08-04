@@ -37,9 +37,10 @@ BRONZE_DIR = Path(__file__).resolve().parent.parent.parent / "Data" / "bronze"
 S3_BUCKET = os.getenv("S3_DATA_BUCKET")
 
 # 'staging' w nazwie celowo -- to nie jest zrodlo dla hurtowni, tylko kopia
-# zapasowa lezaca obok. IT zarzadza tym bucketem Terraformem i ma prawo sie
-# zdziwic nieznanym prefiksem.
-PREFIX = "staging_broadsign_bronze_backup"
+# zapasowa lezaca obok. Zagniezdzone pod broadsign/ (2026-08-03) -- oddziela
+# to od folderu swat/ w tym samym bucketcie. Brak definicji w Glue, IT nie
+# musi niczego mapowac.
+PREFIX = "broadsign/staging_bronze_backup"
 
 # Nowy plik istotnie MNIEJSZY od kopii na S3 = podejrzenie, ze bronze zostal
 # uszkodzony/obciety. Wtedy nadpisanie dobrej kopii bylo by utrata danych --
