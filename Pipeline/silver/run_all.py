@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from datetime import datetime
 
+from Pipeline import status
 from Pipeline.silver.build_campaigns      import build_campaigns
 from Pipeline.silver.build_screens        import build_screens
 from Pipeline.silver.build_players        import build_players
@@ -63,7 +64,8 @@ def run():
     for name, fn, desc in STEPS:
         print(f"\n[{name}]  {desc}")
         try:
-            fn()
+            with status.mierz(name):
+                fn()
             results[name] = "OK"
         except Exception as e:
             import traceback
@@ -71,6 +73,7 @@ def run():
             traceback.print_exc()
             results[name] = f"FAIL: {e}"
 
+    status.dopisz_stany(results)
     elapsed = (datetime.now() - start).seconds
     print(f"\n{'='*55}")
     print(f"  Koniec ({elapsed}s)")

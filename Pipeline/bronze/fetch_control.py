@@ -84,9 +84,14 @@ def fetch_reservations_v22(session) -> dict:
 def fetch_all_control(session) -> dict:
     results = {}
 
+    from time import perf_counter
+
+    from Pipeline import status
+
     for table_name, (resource, version) in ENDPOINTS.items():
         parquet_name = f"ctrl_{table_name}"
         print(f"{table_name}...")
+        _t0 = perf_counter()
 
         try:
             if table_name in INCREMENTAL:
@@ -115,6 +120,10 @@ def fetch_all_control(session) -> dict:
         except Exception as e:
             print(f"  BŁĄD: {e}")
             results[table_name] = {"ok": False, "error": str(e)}
+        finally:
+            # czas mierzymy TEZ dla tabeli, ktora padla -- chcemy wiedziec,
+            # czy przewrocila sie od razu, czy po minucie czekania na API
+            status.CZASY[parquet_name] = perf_counter() - _t0
 
     return results
 

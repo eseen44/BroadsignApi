@@ -21,6 +21,7 @@ from Package.auth import get_session as get_direct_session
 from Package.control.client import get_session as get_control_session
 from Package.popstats.client import get_session as get_popstats_session
 
+from Pipeline import status
 from Pipeline.bronze.fetch_direct import (
     fetch_proposals,
     fetch_proposal_items,
@@ -64,7 +65,8 @@ def run():
     for label, fn in simple_steps:
         print(f"\n[{label}]")
         try:
-            fn(direct)
+            with status.mierz(label):
+                fn(direct)
             results[label] = "OK"
         except Exception as e:
             print(f"  BLAD: {e}")
@@ -80,7 +82,8 @@ def run():
             screen_ids = pd.read_parquet(screens_parquet)["id"].tolist()
         else:
             screen_ids = None  # fallback: fetch_fill_rate pobierze sam
-        fetch_fill_rate(direct, screen_ids=screen_ids)
+        with status.mierz('fill_rate'):
+            fetch_fill_rate(direct, screen_ids=screen_ids)
         results["fill_rate"] = "OK"
     except Exception as e:
         print(f"  BLAD: {e}")
@@ -97,7 +100,8 @@ def run():
 
     print("\n[ctrl_reservations_v22 — proposal_line_item_id]")
     try:
-        r = fetch_reservations_v22(control)
+        with status.mierz('ctrl_reservations_v22'):
+            r = fetch_reservations_v22(control)
         results["ctrl_reservations_v22"] = f"OK ({r['rows']} wierszy)" if r["ok"] else f"FAIL"
     except Exception as e:
         print(f"  BLAD: {e}")
@@ -109,7 +113,8 @@ def run():
     print("\n--- Play logi (append) ---")
     print("\n[play_logs / historical]")
     try:
-        import_historical()
+        with status.mierz('play_logs_historical'):
+            import_historical()
         results["play_logs_historical"] = "OK"
     except Exception as e:
         print(f"  BŁĄD: {e}")
@@ -119,7 +124,8 @@ def run():
 
     print("\n[play_logs / incremental popstats]")
     try:
-        pr = fetch_incremental(popstats)
+        with status.mierz('play_logs_incremental'):
+            pr = fetch_incremental(popstats)
         results["play_logs_incremental"] = f"OK (+{pr['new_files']} pliki, +{pr['new_rows']} wierszy)"
     except Exception as e:
         print(f"  BLAD: {e}")
@@ -127,7 +133,8 @@ def run():
 
     print("\n[resources_latest]")
     try:
-        n = fetch_resources(popstats)
+        with status.mierz('resources_latest'):
+            n = fetch_resources(popstats)
         results["resources_latest"] = f"OK ({n} zasobow)"
     except Exception as e:
         print(f"  BLAD: {e}")
@@ -139,7 +146,8 @@ def run():
     print("\n--- MagicInfo (metro PoP) ---")
     print("\n[magicinfo_pop]")
     try:
-        fetch_magicinfo()
+        with status.mierz('magicinfo_pop'):
+            fetch_magicinfo()
         results["magicinfo_pop"] = "OK"
     except Exception as e:
         print(f"  BLAD: {e}")
@@ -155,7 +163,8 @@ def run():
     print("\n[bronze_backup_s3]")
     try:
         from Pipeline.bronze.backup_to_s3 import backup
-        wyniki = backup()
+        with status.mierz('bronze_backup_s3'):
+            wyniki = backup()
         zle = [k for k, v in wyniki.items() if not v.startswith("OK")]
         if zle:
             results["bronze_backup_s3"] = f"FAIL: {zle}"
@@ -168,6 +177,7 @@ def run():
     # ------------------------------------------------------------------
     # Podsumowanie
     # ------------------------------------------------------------------
+    status.dopisz_stany(results)
     elapsed = (datetime.now() - start).seconds
     print(f"\n{'='*55}")
     print(f"  Koniec ({elapsed}s)")

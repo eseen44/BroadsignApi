@@ -118,6 +118,19 @@ def sprawdz_spojnosc() -> list[str]:
     return problemy
 
 
+def status_z_json(sciezka: Path) -> tuple[dict[str, str], dict[str, float], str]:
+    """Wynik + CZASY z `Data/_run_status.json` (pisane przez Pipeline/status.py).
+
+    Zrodlo lepsze niz log, bo ma czasy per krok. Log zostaje jako fallback dla
+    przebiegow z przed 2026-08-04, kiedy pomiaru per krok jeszcze nie bylo.
+    """
+    import json
+    d = json.loads(sciezka.read_text(encoding="utf-8"))
+    stany = {k["krok"]: k["stan"].split(":")[0] for k in d["kroki"]}
+    czasy = {k["krok"]: k.get("sekundy", 0.0) for k in d["kroki"]}
+    return stany, czasy, d.get("zaczete", "?")
+
+
 def status_z_logu(sciezka: Path) -> dict[str, str]:
     """Wynik ostatniego przebiegu z `pipeline.log`.
 
@@ -146,8 +159,9 @@ WARSTWY = [
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--status", metavar="PIPELINE_LOG", default=None,
-                    help="pokoloruj wynikiem z pipeline.log (sciezka do logu)")
+    ap.add_argument("--status", metavar="PLIK", default=None,
+                    help="pokoloruj wynikiem: Data/_run_status.json (z czasami) "
+                         "albo pipeline.log (bez czasow)")
     args = ap.parse_args()
 
     problemy = sprawdz_spojnosc()
@@ -155,18 +169,25 @@ def main() -> int:
         print(f"%% UWAGA: {p}", file=sys.stderr)
 
     stan: dict[str, str] = {}
+    czasy: dict[str, float] = {}
+    zaczete = ""
     if args.status:
         sciezka = Path(args.status)
         if not sciezka.exists():
             print(f"BLAD: nie ma pliku {sciezka}", file=sys.stderr)
             return 1
-        stan = status_z_logu(sciezka)
+        if sciezka.suffix == ".json":
+            stan, czasy, zaczete = status_z_json(sciezka)
+        else:
+            stan = status_z_logu(sciezka)
+            czasy, zaczete = {}, "(z logu, bez czasow)"
         if not stan:
-            print("BLAD: w logu nie znalazlem zadnych krokow "
-                  "(spodziewam sie linii typu '  OK   dim_date')", file=sys.stderr)
+            print("BLAD: nie znalazlem zadnych krokow w " + str(sciezka), file=sys.stderr)
             return 1
 
     print("```mermaid")
+    if zaczete:
+        print(f"%% przebieg z {zaczete}")
     print("flowchart TD")
     if stan:
         # Kolor tekstu JAWNIE -- bez tego Mermaid dobiera go wg motywu i na
@@ -185,7 +206,12 @@ def main() -> int:
             wszystkie.append((wid, krok))
             otw, zam = ("[", "]") if kryt else ("(", ")")
             gwiazdka = "" if kryt else " *"
-            print(f'    {wid}{otw}"{krok}{gwiazdka}"{zam}')
+            sek = czasy.get(krok)
+            czas = ""
+            if sek:
+                czas = (f"<br/>{int(sek // 60)}m {int(sek % 60):02d}s" if sek >= 60
+                        else f"<br/>{sek:.0f}s")
+            print(f'    {wid}{otw}"{krok}{gwiazdka}{czas}"{zam}')
         print("  end")
 
     print('  subgraph SYNC["SYNC — dokad ida wyniki"]')

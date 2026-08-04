@@ -21,6 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from datetime import datetime
+from Pipeline import status
 from Pipeline.gold.build_dims import (
     build_dim_date, build_dim_screen, build_dim_player, build_dim_content
 )
@@ -72,7 +73,8 @@ def run():
     for name, fn in STEPS:
         print(f"\n[{name}]")
         try:
-            fn()
+            with status.mierz(name):
+                fn()
             results[name] = "OK"
         except Exception as e:
             import traceback
@@ -80,6 +82,7 @@ def run():
             traceback.print_exc()
             results[name] = f"FAIL: {e}"
 
+    status.dopisz_stany(results)
     elapsed = (datetime.now() - start).seconds
     print(f"\n{'='*55}")
     print(f"  Koniec ({elapsed}s)")

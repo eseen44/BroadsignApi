@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from datetime import datetime
 
+from Pipeline import status
 from Pipeline.bronze.run_all import run as run_bronze
 from Pipeline.silver.run_all import run as run_silver
 from Pipeline.gold.run_all   import run as run_gold
@@ -64,6 +65,8 @@ def run():
                 print("!!! (lepiej stare-ale-spojne niz swiezo policzone z dziury).")
             break
 
+    if sciezka := status.zapisz():
+        print(f"  status krokow: {sciezka}")
     elapsed = (datetime.now() - start).seconds
     print(f"\n{'='*60}")
     print(f"  Łącznie: {elapsed}s")
