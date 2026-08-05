@@ -64,7 +64,12 @@ def build_dim_campaign():
     print(f"  Serwisowe (1): {(df['is_serwisowy']==1).sum()}")
     print(f"  Single-panel (2): {(df['is_serwisowy']==2).sum()}")
 
-    for col in ["client_id", "owner_user_id"]:
+    # `campaign_status` MUSI byc tu rzutowany na Int64 (nullable), a nie zostawiony
+    # pandasowi. Syntetyczne wiersze wyzej nie maja tej kolumny, wiec `concat` wstawia
+    # NaN i podnosi ja do float64 -> parquet zapisuje DOUBLE. Definicja tabeli w Glue
+    # mowi BIGINT, wiec Athena wywalala sie wtedy na HIVE_BAD_DATA przy odczycie CALEJ
+    # tabeli (`count(*)` przechodzil, bo nie czyta kolumny) -- zlapane 2026-08-05.
+    for col in ["client_id", "owner_user_id", "campaign_status"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
 

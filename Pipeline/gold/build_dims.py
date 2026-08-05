@@ -139,32 +139,40 @@ def build_dim_date():
 
     Kolumny wzorowane na DAX Calendar używanym dotychczas,
     z polskimi nazwami miesięcy i dni.
+
+    NAZWY KOLUMN MUSZA BYC snake_case — inaczej Athena czyta tę tabelę jako NULL-e.
+    Athena mapuje kolumny parquetu PO NAZWIE, a Hive/Glue nie potrafi zapisać nazwy
+    ze spacją ani z myślnikiem. Wcześniejsze `Month Number` / `ISO Week3` / `Year-Month`
+    nie miały odpowiednika w definicji tabeli, więc 12 z 18 kolumn wracało puste
+    **bez żadnego błędu** (2026-08-05). Nazwy widoczne w Power BI (`Month Number` itd.)
+    NIE zmieniają się — model przemianowuje je u siebie w Power Query, żeby nie ruszać
+    miar, relacji ani parametrów pól.
     """
     dates = pd.date_range(start="2025-01-01", end="2027-12-31", freq="D")
-    df = pd.DataFrame({"Date": dates})
+    df = pd.DataFrame({"date": dates})
 
-    iso = df["Date"].dt.isocalendar()   # year, week, day (1=Pn … 7=Nd)
+    iso = df["date"].dt.isocalendar()   # year, week, day (1=Pn … 7=Nd)
     iso_day  = iso["day"].astype(int)
     iso_week = iso["week"].astype(int)
     iso_year = iso["year"].astype(int)
 
-    df["date_key"]        = df["Date"].dt.strftime("%Y-%m-%d")   # FK do fact tables
-    df["Year"]            = df["Date"].dt.year
-    df["Month Number"]    = df["Date"].dt.month
-    df["Month Name"]      = df["Date"].dt.month.map(PL_MONTH_FULL)
-    df["Short Month"]     = df["Date"].dt.month.map(PL_MONTH_SHORT)
-    df["Quarter"]         = "Q" + df["Date"].dt.quarter.astype(str)
-    df["Year-Month"]      = df["Date"].dt.strftime("%Y-%m")
-    df["Weekday Name"]    = iso_day.map(PL_WEEKDAY_FULL)
-    df["Short Weekday"]   = iso_day.map(PL_WEEKDAY_SHORT)
-    df["Weekday Number"]  = iso_day                   # 1=Pn, 7=Nd (jak DAX WEEKDAY(...,2))
-    df["ISO Year"]        = iso_year
-    df["ISO Week"]        = iso_week
-    df["ISO Week2"]       = ", tydzień: " + iso_week.astype(str)
-    df["ISO Week3"]       = "Week: "      + iso_week.astype(str)
-    df["YearWeek Index"]  = iso_year * 100 + iso_week
+    df["date_key"]        = df["date"].dt.strftime("%Y-%m-%d")   # FK do fact tables
+    df["year"]            = df["date"].dt.year
+    df["month_number"]    = df["date"].dt.month
+    df["month_name"]      = df["date"].dt.month.map(PL_MONTH_FULL)
+    df["short_month"]     = df["date"].dt.month.map(PL_MONTH_SHORT)
+    df["quarter"]         = "Q" + df["date"].dt.quarter.astype(str)
+    df["year_month"]      = df["date"].dt.strftime("%Y-%m")
+    df["weekday_name"]    = iso_day.map(PL_WEEKDAY_FULL)
+    df["short_weekday"]   = iso_day.map(PL_WEEKDAY_SHORT)
+    df["weekday_number"]  = iso_day                   # 1=Pn, 7=Nd (jak DAX WEEKDAY(...,2))
+    df["iso_year"]        = iso_year
+    df["iso_week"]        = iso_week
+    df["iso_week2"]       = ", tydzień: " + iso_week.astype(str)
+    df["iso_week3"]       = "Week: "      + iso_week.astype(str)
+    df["year_week_index"] = iso_year * 100 + iso_week
     df["is_weekend"]      = iso_day.isin([6, 7])
-    df["Date"]            = df["Date"].dt.strftime("%Y-%m-%d")   # zostaw jako string
+    df["date"]            = df["date"].dt.strftime("%Y-%m-%d")   # zostaw jako string
 
     # Walidacja ciągłości
     assert len(df) == (pd.Timestamp("2027-12-31") - pd.Timestamp("2025-01-01")).days + 1, \
