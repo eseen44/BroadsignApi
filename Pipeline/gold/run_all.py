@@ -96,25 +96,51 @@ def run():
 
     if not fail:
         gold_dir = Path(__file__).resolve().parent.parent.parent / "Data" / "gold"
-        print(f"\n[sync → OneDrive]")
-        sync_to_onedrive(gold_dir)
 
-        # S3/Athena — NON-CRITICAL, celowo nie wplywa na kod wyjscia.
-        # Dopoki Power BI czyta z SharePointa, krytyczna sciezka to OneDrive
-        # wyzej; S3 jest dodatkiem. Gold policzyl sie poprawnie i trafil do
-        # PBI, wiec chwilowa awaria S3 (padniety VPN, throttling) nie moze
-        # wywalac calego pipeline'u. upload_retry ponawia bledy przejsciowe.
-        # PO PRZEPIECIU PBI NA ODBC: przeniesc krytycznosc tutaj.
-        print(f"\n[sync → S3/Athena]")
+        # OBIE sciezki dostawy sa KRYTYCZNE — decyzja usera 2026-08-05.
+        # Power BI czyta dzis z Ateny przez ODBC, a UbuntuSynch -> SharePoint obsluguje
+        # pozostalych odbiorcow. Niedostarczenie do KTOREJKOLWIEK z nich znaczy, ze ktos
+        # patrzy na stare liczby, wiec musi dac niezerowy kod wyjscia.
+        # Wczesniej S3 bylo non-critical (bo PBI czytal ze SharePointa) i jego awaria
+        # przechodzila bez sladu w kodzie wyjscia — czyli cron raportowalby sukces przy
+        # niedostarczonych danych. `upload_retry` w sync_to_athena nadal ponawia bledy
+        # przejsciowe, wiec twardy FAIL tutaj znaczy realny problem, nie mrugnieta siec.
+        dostawa: dict[str, str] = {}
+
+        print("\n[sync_onedrive]")
         try:
-            from Pipeline.gold.sync_to_athena import sync, wszystkie_tabele
-            wyniki = sync(wszystkie_tabele())
+            with status.mierz("sync_onedrive"):
+                sync_to_onedrive(gold_dir)
+            dostawa["sync_onedrive"] = "OK"
+        except Exception as e:
+            import traceback
+            print(f"  BLAD: {e}")
+            traceback.print_exc()
+            dostawa["sync_onedrive"] = f"FAIL: {e}"
+
+        print("\n[sync_s3]")
+        try:
+            with status.mierz("sync_s3"):
+                from Pipeline.gold.sync_to_athena import sync, wszystkie_tabele
+                wyniki = sync(wszystkie_tabele())
             zle = [t for t, w in wyniki.items() if not w.startswith("OK")]
             if zle:
-                print(f"  UWAGA: nie wyslano na S3: {zle} (nie blokuje pipeline'u)")
+                print(f"  BLAD: nie wyslano na S3: {zle}")
+                dostawa["sync_s3"] = f"FAIL: nie wyslano {zle}"
+            else:
+                dostawa["sync_s3"] = "OK"
         except Exception as e:
-            print(f"  UWAGA: sync na S3 padl ({type(e).__name__}: {str(e)[:120]}) "
-                  f"-- nie blokuje pipeline'u")
+            import traceback
+            print(f"  BLAD: sync na S3 padl: {type(e).__name__}: {e}")
+            traceback.print_exc()
+            dostawa["sync_s3"] = f"FAIL: {type(e).__name__}: {e}"
+
+        status.dopisz_stany(dostawa)
+        results.update(dostawa)
+        print()
+        for k, v in dostawa.items():
+            print(f"  {'OK  ' if v == 'OK' else 'FAIL'} {k}: {v}")
+        fail += [k for k, v in dostawa.items() if v != "OK"]
 
     return len(fail) == 0
 
